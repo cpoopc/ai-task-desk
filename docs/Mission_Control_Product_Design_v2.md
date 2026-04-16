@@ -1,7 +1,7 @@
 # AI Dev Mission Control — Product Design Document
 
-> Version 2.0 | April 2026
-> A coordination layer that sits above AI coding tools to reduce cognitive overhead.
+> Version 3.0 | April 2026
+> A collaborative coordination layer that sits above AI coding tools to reduce cognitive overhead.
 
 ---
 
@@ -12,14 +12,15 @@ AI coding tools (Cursor, Claude Code, Codex, Kiro) have compressed production ti
 - **Iterative back-and-forth**: A typical feature requires 5-7 rounds of AI interaction. Most "supplements" (caching, feature flags, metrics, logging) are predictable but not captured upfront.
 - **Cross-task context switching**: Developers manage 3-5 concurrent tasks across different AI workspaces, repos, and stages. Each switch requires dumping one mental context and loading another. AI tools have no memory across sessions.
 - **Review fatigue**: Every AI output requires judgment calls — is this correct, does it match intent, what's missing. This is cognitively expensive and done across many contexts in rapid succession.
+- **Team coordination gap**: Task briefs, decisions, and AI context live in individual developers' heads or local machines. No shared visibility into who's working on what, what decisions were made, or where blockers exist. Code review lacks architectural context.
 
-**Core insight**: The developer's bottleneck has shifted from code production to decision-making (architecture, error handling, tradeoffs). Mission Control protects decision-making energy by reducing unnecessary cognitive load.
+**Core insight**: The developer's bottleneck has shifted from code production to decision-making (architecture, error handling, tradeoffs). Mission Control protects decision-making energy by reducing unnecessary cognitive load — for individuals and across teams.
 
 ---
 
 ## 2. Solution overview
 
-Mission Control is a local-first coordination layer with five integrated modules:
+Mission Control is a collaborative coordination layer with six integrated modules:
 
 | Module | Purpose | Key pain solved |
 |--------|---------|-----------------|
@@ -28,6 +29,7 @@ Mission Control is a local-first coordination layer with five integrated modules
 | Context Sync | Cross-task dashboard, session restore, link detection | Eliminates "where was I?" context rebuild |
 | Task Graph & Relationships | Visual dependency map, enriched task cards, workflow view | Provides global view, prevents blind spots |
 | Dynamic Plan & Archive | Living daily plan, disruption handling, daily/sprint summaries | Keeps the plan alive as reality changes |
+| Collaboration & Sharing | Contacts, roles, assignment, real-time co-editing, notifications | Shared context across team members |
 
 ---
 
@@ -285,16 +287,77 @@ Four pre-built scenarios with one-click AI replan:
 
 ---
 
-## 8. Navigation & layout
+## 8. Module 6: Collaboration & sharing
 
-### 8.1 App structure
+### 8.1 Contact system
+
+A shared directory of people who interact with tasks. Each contact has: name, email, avatar, team, role title, and external IDs (Jira account, Slack user, GitHub username).
+
+**Contact sources (progressive)**:
+- Phase 1: Manual entry in Dashboard
+- Phase 2: Auto-import from Jira project members and Slack workspace
+- Phase 3: Corporate LDAP / SSO directory sync
+
+Contacts are shared across the project. When a Jira issue is linked to a task, the assignee from Jira is automatically suggested as a contact.
+
+### 8.2 Project roles (who can see what)
+
+| Role | View tasks | Create tasks | Edit any task | Manage members | Settings |
+|------|-----------|-------------|--------------|---------------|----------|
+| Admin | All | Yes | Yes | Yes | Yes |
+| Member | All | Yes | Own tasks only | No | No |
+| Viewer | All | No | No | No | No |
+| External | Assigned tasks only | No | No | No | No |
+
+### 8.3 Task roles (who does what)
+
+Each task has people assigned with specific roles:
+
+- **Owner**: The person doing the work. Full edit rights. Receives all notifications. One owner per task (can be reassigned).
+- **Reviewer**: Reviews AI output and code. Receives review-ready notifications. Can approve/reject in review queue. Multiple allowed.
+- **Collaborator**: Co-works on the task. Can edit brief, check items, log decisions. Receives status change notifications. Multiple allowed.
+- **Stakeholder**: Interested party. Read-only. Receives completion notification only (e.g., PM, tech lead).
+- **Watcher**: Self-subscribed observer. Read-only. Receives all change notifications. Anyone can watch any visible task.
+
+### 8.4 Task assignment flow
+
+Three assignment mechanisms:
+- **Admin assigns**: Admin creates task, assigns owner + reviewer
+- **Self-claim**: Unassigned task in backlog, member clicks "Claim" to become owner
+- **Reassign**: Admin or current owner transfers ownership to another member
+
+### 8.5 Collaborative editing
+
+- **Comments on brief**: Inline comments on any section of brief.md. Thread-based, resolvable.
+- **@mentions**: In decisions and comments, @mention a contact to notify them.
+- **Edit history**: Who changed what, when. Diff view for brief changes. Powered by version tracking in DB.
+- **Presence indicators**: Avatar + "editing" shown when someone is actively editing a section. Optimistic locking (warn, don't block).
+
+### 8.6 Dashboard — multi-user additions
+
+- **View switcher**: "My tasks" (default) / "Team tasks" / "All tasks". "My tasks" shows tasks where you are owner, reviewer, or collaborator.
+- **Avatar stack on cards**: Each task card shows assigned people (owner + reviewer), max 3 with "+N" overflow.
+- **Activity feed**: Optional sidebar panel showing recent team actions: "James approved Data pipeline review", "Sarah commented on AIR brief".
+- **Presence dots**: Green dot on avatars of people currently viewing a task.
+
+### 8.7 Notifications
+
+- **In-app**: Bell icon with unread count. Dropdown showing recent events relevant to you.
+- **Email digest**: Optional daily digest of task updates (configurable per user).
+- **Slack webhook**: Optional push to team Slack channel.
+- **Role-based filtering**: Owner gets everything. Reviewer gets review-ready. Stakeholder gets completion only. Configurable per user.
+
+---
+
+## 9. Navigation & layout
+
+### 9.1 App structure
 
 Left sidebar (240px) with 4 zones: sprint selector, navigation, folder tree, tag filters. Main content area with top bar (title, sprint badge, search, "+ New brief" button), breadcrumb, and content.
 
-### 8.2 View modes
+### 9.2 View modes
 
 | View | Access | Shows |
-|------|--------|-------|
 | Dashboard | Home page | Focus area + grouped task list |
 | Task graph | Dashboard toolbar | Visual dependency map |
 | Kanban | Dashboard toolbar | Sprint workflow columns |
@@ -304,39 +367,43 @@ Left sidebar (240px) with 4 zones: sprint selector, navigation, folder tree, tag
 | Daily summary | End of day | Recap + standup export |
 | Sprint summary | Sprint close | Full sprint archive |
 
-### 8.3 Design aesthetic
+### 9.3 Design aesthetic
 
 Clean, minimal, flat. No gradients or shadows. Thin borders (0.5px-1px). Purple (#534AB7) primary accent. Status colors: green (success), amber (active/warning), red (blocked/error), blue (info/AI-working), gray (neutral). Light/dark mode. Monospace for code, sans-serif for everything else.
 
 ---
 
-## 9. Key interactions to get right
+## 10. Key interactions to get right
 
-1. Creating a brief → selecting template → checklist auto-populates → assigning to folder and sprint → organized from the start
-2. Checking off checklist items with resolved values → progress bar updating → satisfying loop
+1. Creating a brief → selecting template → checklist auto-populates → assigning owner + reviewer → organized from the start
+2. Checking off checklist items with resolved values → progress bar updating → team sees progress in real-time
 3. Dashboard focus area → opening the app → immediately seeing 2-3 actionable items → zero decision fatigue
-4. Sprint selector → switching sprints → only relevant tasks visible
-5. Folder navigation → clicking into a service folder → seeing only that service's tasks → hiding irrelevant folders
-6. Tag filtering → clicking "high-risk" → seeing all high-risk tasks across folders
-7. Task graph → seeing the full dependency picture → knowing which review unblocks the most
-8. Context export → paste into AI tool → AI has full context → first-round accuracy
-9. AI plan → accepting/adjusting daily plan → knowing exactly what to do next
-10. Disruption → "I have 2 hours today" → AI replans → adapted in seconds
-11. Session restore → back after 2 days → seeing exactly where you left off
-12. Sprint close → carry/suspend/backlog each incomplete task → clean start next sprint
-13. Daily standup export → one click → formatted message ready for Slack
+4. View switcher → "My tasks" vs "Team tasks" → clear personal vs team perspective
+5. Sprint selector → switching sprints → only relevant tasks visible
+6. Folder navigation → clicking into a service folder → seeing only that service's tasks → hiding irrelevant folders
+7. Tag filtering → clicking "high-risk" → seeing all high-risk tasks across folders
+8. Task graph → seeing the full dependency picture → knowing which review unblocks the most
+9. Context export → paste into AI tool → AI has full context → first-round accuracy
+10. AI plan → accepting/adjusting daily plan → knowing exactly what to do next
+11. Disruption → "I have 2 hours today" → AI replans → adapted in seconds
+12. Session restore → back after 2 days → seeing exactly where you left off
+13. Sprint close → carry/suspend/backlog each incomplete task → clean start next sprint
+14. Daily standup export → one click → formatted message ready for Slack
+15. Assigning a task → owner gets notification + full brief context → immediate onboarding
+16. @mention in decision log → stakeholder gets notified → decision visible to the right people
+17. Claiming an unassigned task → one click → you're the owner with full context
 
 ---
 
-## 10. Implementation roadmap
+## 11. Implementation roadmap
 
-### Phase 1: MVP (Weeks 1-3)
-- File-based storage (brief.md, checklist.md, decisions.md, .meta.yaml)
-- SQLite index cache with file watcher
+### Phase 1: Solo MVP (Weeks 1-3)
+- Local-first: SQLite + file-based storage
 - 5 checklist templates
 - Dashboard with focus area + grouped task list
 - Context export to .cursorrules / CLAUDE.md / AGENTS.md
 - Folder tree sidebar
+- Single-user, no auth
 
 ### Phase 2: Review & relationships (Weeks 4-6)
 - Review queue with intent checking
@@ -351,11 +418,26 @@ Clean, minimal, flat. No gradients or shadows. Thin borders (0.5px-1px). Purple 
 - Disruption handling (urgent task, reduced capacity, scope change)
 - Cross-task link detection (rule-based)
 - Session restore
-
-### Phase 4: Archive & intelligence (Weeks 10-12)
 - Daily/sprint summaries and archive
-- Carry-over workflow (carry, suspend, backlog)
-- Enriched task cards (people, external links)
+
+### Phase 4: Team collaboration (Weeks 10-14)
+- Migrate storage to PostgreSQL (keep local file bridge via mc sync)
+- Contact system (manual entry + Jira/Slack import)
+- Project roles (admin/member/viewer/external) + auth (SSO/email invite)
+- Task roles (owner/reviewer/collaborator/stakeholder/watcher)
+- Task assignment + self-claim
+- Real-time sync via WebSocket
+- In-app notifications + email digest + Slack webhook
+- Collaborative editing with comments, @mentions, presence indicators
+- View switcher (My tasks / Team tasks / All tasks)
+- Activity feed
+- Docker Compose deployment for team self-hosting
+
+### Phase 5: Intelligence & scale (Weeks 15-18)
+- Enriched task cards with live external link status sync
 - Kanban workflow view
 - Personal checklist layer (learning from history)
 - MCP server for bidirectional AI tool integration
+- Semantic cross-task matching (embeddings)
+- LDAP/SSO directory sync
+- Cloud deployment option (multi-org SaaS)
