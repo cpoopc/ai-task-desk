@@ -1,0 +1,12 @@
+# <type>(<scope>): <description>
+#
+# Types: feat | fix | docs | style | refactor | test | chore | revert
+# Scope: frontend | backend | api | docs | infra | ...
+#
+# Examples:
+#   feat(frontend): add new dashboard component
+#   fix(api): resolve authentication token expiry issue
+#   docs(readme): update installation instructions
+#
+# Lines starting with # will be ignored.
+# A commit without a valid type is rejected.
