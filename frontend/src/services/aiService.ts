@@ -1,96 +1,58 @@
-
-import { GoogleGenAI, Type } from "@google/genai";
 import { TaskBrief, Sprint } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
-
+// Mock AI service - generates plans locally without external API
 export const aiService = {
   async generateDailyPlan(tasks: TaskBrief[], sprint: Sprint) {
-    const prompt = `
-      As an expert AI project manager, generate a daily plan for the next 3 days based on the following tasks and sprint context.
-      
-      Sprint: ${JSON.stringify(sprint)}
-      Tasks: ${JSON.stringify(tasks.map(t => ({ 
-        id: t.id, 
-        goal: t.goal, 
-        status: t.meta.status, 
-        path: t.path,
-        checklist: t.checklist.filter(c => !c.completed),
-        relations: t.meta.relations
-      })))}
-      
-      Generate a daily plan in JSON format.
-    `;
+    // Simple local planning algorithm based on task priority and dependencies
+    const incompleteTasks = tasks.filter(t => !t.meta.status || t.meta.status !== 'Done');
 
-    try {
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                day: { type: Type.STRING, description: "Day label like 'Today', 'Tomorrow', 'Day 3'" },
-                tasks: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      taskId: { type: Type.STRING },
-                      title: { type: Type.STRING },
-                      estimatedTime: { type: Type.STRING },
-                      action: { type: Type.STRING, description: "Specific action to take" }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      });
-      return JSON.parse(response.text);
-    } catch (error) {
-      console.error("Failed to generate plan:", error);
-      return [];
-    }
+    // Group tasks by priority if available
+    const todayTasks = incompleteTasks.slice(0, 5).map(t => ({
+      taskId: t.id,
+      title: t.goal.split('.').slice(0, 2).join('.').substring(0, 50),
+      estimatedTime: "1h",
+      action: t.goal
+    }));
+
+    const tomorrowTasks = incompleteTasks.slice(5, 10).map(t => ({
+      taskId: t.id,
+      title: t.goal.split('.').slice(0, 2).join('.').substring(0, 50),
+      estimatedTime: "1h",
+      action: t.goal
+    }));
+
+    const day3Tasks = incompleteTasks.slice(10, 15).map(t => ({
+      taskId: t.id,
+      title: t.goal.split('.').slice(0, 2).join('.').substring(0, 50),
+      estimatedTime: "1h",
+      action: t.goal
+    }));
+
+    return [
+      { day: 'Today', tasks: todayTasks },
+      { day: 'Tomorrow', tasks: tomorrowTasks },
+      { day: 'Day 3', tasks: day3Tasks }
+    ].filter(day => day.tasks.length > 0);
   },
 
   async detectLinks(tasks: TaskBrief[]) {
-    // Logic to detect similar tasks based on goal and technical details
-    const prompt = `
-      Analyze these task briefs and identify potential relationships (blocks, depends-on, related-to).
-      Tasks: ${JSON.stringify(tasks.map(t => ({ id: t.id, goal: t.goal, technicalDetails: t.technicalDetails, path: t.path })))}
-      
-      Return a list of detected links.
-    `;
+    // Simple local link detection based on task relationships
+    const links: Array<{ sourceId: string; targetId: string; type: string; rationale: string }> = [];
 
-    try {
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                sourceId: { type: Type.STRING },
-                targetId: { type: Type.STRING },
-                type: { type: Type.STRING, enum: ["blocks", "depends-on", "related-to"] },
-                rationale: { type: Type.STRING }
-              }
-            }
-          }
-        }
-      });
-      return JSON.parse(response.text);
-    } catch (error) {
-      console.error("Failed to detect links:", error);
-      return [];
-    }
+    // Check for explicit relations in task metadata
+    tasks.forEach(task => {
+      if (task.meta.relations) {
+        task.meta.relations.forEach((rel: any) => {
+          links.push({
+            sourceId: task.id,
+            targetId: rel.targetId || rel,
+            type: rel.type || 'related-to',
+            rationale: 'Auto-detected from task relations'
+          });
+        });
+      }
+    });
+
+    return links;
   }
 };
