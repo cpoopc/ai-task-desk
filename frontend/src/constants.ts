@@ -1,0 +1,110 @@
+
+import { TaskBrief, Sprint, Folder, TaskStatus } from './types';
+
+export const INITIAL_FOLDERS: Folder[] = [
+  { id: 'all', name: 'All Tasks', tasks: ['1', '2', '3'] },
+  { id: 'deprovisioning', name: 'AIR Deprovisioning', tasks: ['1'], color: '#ef4444' },
+  { id: 'auth', name: 'Authentication', tasks: ['2'], color: '#3b82f6' },
+  { id: 'backend', name: 'Backend Services', tasks: ['3'], color: '#10b981' },
+];
+
+export const INITIAL_SPRINTS: Sprint[] = [
+  {
+    id: 'sprint-23',
+    name: 'Sprint 23',
+    startDate: '2026-04-10',
+    endDate: '2026-04-24',
+    dayCount: 14,
+    storyCount: 42,
+    tasks: ['1', '2', '3'],
+  },
+];
+
+export const INITIAL_TASKS: TaskBrief[] = [
+  {
+    id: '1',
+    path: 'AIR deprovisioning/01-cache-layer',
+    goal: 'Implement Redis-based cache layer for session management.',
+    technicalDetails: 'Use Redis Cluster with sentinel. Schema: session:{uid} -> JSON.',
+    errorHandling: 'Scenario: Connection Error -> Behavior: Fallback to local map -> Rationale: Availability over consistency.',
+    metrics: [{ name: 'cache_hit_ratio', type: 'gauge', description: 'Percentage of hits' }],
+    filesAffected: [{ path: 'src/services/cache.ts', action: 'new' }],
+    constraints: ['Max TTL 24h', 'No sensitive data in cache'],
+    references: ['https://redis.io/docs/'],
+    checklist: [
+      { id: 'c1', text: 'Configure Redis Cluster', phase: 'Design', priority: 'must', completed: true, resolvedValue: 'AWS Elasticache' },
+      { id: 'c2', text: 'Implement retry logic', phase: 'Implementation', priority: 'should', completed: false },
+    ],
+    decisions: [
+      { id: 'd1', question: 'Caffeine or Redis?', answer: 'Redis', rationale: 'Distributed nature of the app', source: 'Architectural Review', timestamp: '2026-04-15' },
+    ],
+    meta: {
+      status: 'In progress',
+      currentStep: 2,
+      totalSteps: 5,
+      assignedAI: 'Cursor',
+      jiraKey: 'DEV-101',
+      tags: ['backend', 'performance'],
+      owner: { name: 'Alice', avatar: 'https://picsum.photos/seed/alice/32/32' },
+      stakeholders: [{ name: 'Bob', avatar: 'https://picsum.photos/seed/bob/32/32' }],
+      externalLinks: [{ type: 'jira', title: 'DEV-101', url: '#' }],
+      relations: [],
+      resources: [],
+    },
+    subtasks: [],
+  },
+  {
+    id: '2',
+    path: 'Authentication/OIDC-flow',
+    goal: 'Migrate legacy auth to OIDC with Google Workspace.',
+    technicalDetails: 'OAuth 2.0 PKCE flow.',
+    errorHandling: 'Scenario: Auth Failed -> Behavior: Show error toast -> Rationale: Direct user feedback.',
+    metrics: [{ name: 'login_success', type: 'counter', description: 'Successful logins' }],
+    filesAffected: [{ path: 'src/auth/oidc.ts', action: 'new' }],
+    constraints: ['Enforce HTTPS', 'Token expiry 1h'],
+    references: [],
+    checklist: [
+      { id: 'c3', text: 'Register Client ID', phase: 'Auth', priority: 'must', completed: true },
+    ],
+    decisions: [],
+    meta: {
+      status: 'AI working',
+      currentStep: 1,
+      totalSteps: 3,
+      assignedAI: 'Claude Code',
+      tags: ['auth', 'security'],
+      owner: { name: 'Charlie', avatar: 'https://picsum.photos/seed/charlie/32/32' },
+      stakeholders: [],
+      externalLinks: [],
+      relations: [],
+      resources: [],
+    },
+    subtasks: [],
+  },
+  {
+    id: '3',
+    path: 'Backend/API-refactor',
+    goal: 'Refactor REST endpoints to use service layer.',
+    technicalDetails: 'Separate controller logic from DB queries.',
+    errorHandling: 'Scenario: Service error -> Behavior: 500 status -> Rationale: Internal error.',
+    metrics: [],
+    filesAffected: [],
+    constraints: [],
+    references: [],
+    checklist: [],
+    decisions: [],
+    meta: {
+      status: 'Review',
+      currentStep: 3,
+      totalSteps: 3,
+      assignedAI: 'Codex',
+      tags: ['refactor'],
+      owner: { name: 'Alice', avatar: 'https://picsum.photos/seed/alice/32/32' },
+      stakeholders: [],
+      externalLinks: [],
+      relations: [],
+      resources: [],
+    },
+    subtasks: [],
+  },
+];

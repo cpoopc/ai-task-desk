@@ -1,0 +1,6 @@
+{
+  "name": "AI Dev Mission Control",
+  "description": "A coordination layer for AI coding tools to reduce cognitive overhead and manage tasks, reviews, and context.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
