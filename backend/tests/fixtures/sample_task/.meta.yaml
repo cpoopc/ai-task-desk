@@ -1,0 +1,22 @@
+status: in_progress
+currentStep: 2
+totalSteps: 4
+assignedTool: codex
+templateType: feature
+jiraKey: TEST-123
+tags:
+  - backend
+  - testing
+  - fastapi
+lastActivity: Updated checklist
+createdAt: "2024-01-01T00:00:00Z"
+lastActiveAt: "2024-01-15T10:30:00Z"
+people:
+  - name: Developer
+    role: backend
+links:
+  - path: Sprint 1/Related Task
+    type: blocks
+relations:
+  - type: parent
+    path: Sprint 1/Parent Task
