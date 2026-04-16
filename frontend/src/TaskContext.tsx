@@ -1,7 +1,13 @@
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { TaskBrief, Sprint, Folder } from './types';
+import { briefsAPI, sprintsAPI, foldersAPI } from './services/api';
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { TaskBrief, Sprint, Folder, TaskStatus } from './types';
-import { INITIAL_TASKS, INITIAL_SPRINTS, INITIAL_FOLDERS } from './constants';
+interface ApiFolder {
+  name: string;
+  path: string;
+  type: string;
+  children?: ApiFolder[];
+}
 
 interface TaskContextType {
   tasks: TaskBrief[];
@@ -16,17 +22,77 @@ interface TaskContextType {
   updateTask: (task: TaskBrief) => void;
   addTaskRelation: (sourceId: string, targetId: string, type: 'blocks' | 'blocked-by' | 'depends-on' | 'related-to') => void;
   getTaskById: (id: string) => TaskBrief | undefined;
+  loading: boolean;
+  error: string | null;
+  refreshTasks: () => Promise<void>;
 }
 
 const TaskContext = createContext<TaskContextType | undefined>(undefined);
 
 export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [tasks, setTasks] = useState<TaskBrief[]>(INITIAL_TASKS);
-  const [sprints] = useState<Sprint[]>(INITIAL_SPRINTS);
-  const [folders] = useState<Folder[]>(INITIAL_FOLDERS);
-  const [activeSprintId, setActiveSprintId] = useState<string>(INITIAL_SPRINTS[0].id);
+  const [tasks, setTasks] = useState<TaskBrief[]>([]);
+  const [sprints, setSprints] = useState<Sprint[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [activeSprintId, setActiveSprintId] = useState<string>('');
   const [activeFolderId, setActiveFolderId] = useState<string>('all');
   const [activeTags, setActiveTags] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const refreshTasks = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [briefsRes, sprintsRes, foldersRes] = await Promise.all([
+        briefsAPI.list(),
+        sprintsAPI.list(),
+        foldersAPI.getTree(),
+      ]);
+
+      const tasksFromApi = await Promise.all(
+        briefsRes.map((b) => briefsAPI.get(b.folder_path).catch(() => null))
+      );
+
+      const validTasks = tasksFromApi.filter(Boolean) as TaskBrief[];
+      setTasks(validTasks);
+      setSprints(sprintsRes.map((s: { id: string; name: string; start_date?: string; status: string }) => ({
+        id: s.id,
+        name: s.name,
+        startDate: s.start_date || '',
+        endDate: '',
+        dayCount: 0,
+        storyCount: validTasks.filter(t => t.path.startsWith(s.name)).length,
+        tasks: validTasks.filter(t => t.path.startsWith(s.name)).map(t => t.id),
+      })));
+
+      const folderTree = foldersRes as ApiFolder;
+      const flattenFolders = (f: ApiFolder, parentId?: string): Folder[] => {
+        const current: Folder = {
+          id: f.path || f.name,
+          name: f.name,
+          parentId,
+          tasks: validTasks.filter(t => t.path.startsWith(f.path || f.name)).map(t => t.id),
+          color: undefined,
+        };
+        const children = (f.children || []).flatMap(c => flattenFolders(c, current.id));
+        return [current, ...children];
+      };
+      setFolders(flattenFolders(folderTree));
+
+      if (sprintsRes.length > 0 && !activeSprintId) {
+        setActiveSprintId(sprintsRes[0].id);
+      }
+    } catch (err) {
+      console.error('Failed to load from API:', err);
+      setError('Failed to load from backend API');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    refreshTasks();
+  }, []);
 
   const toggleTag = (tag: string) => {
     setActiveTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
@@ -34,6 +100,18 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const updateTask = (updatedTask: TaskBrief) => {
     setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
+    const path = updatedTask.path;
+    briefsAPI.update(path, {
+      title: updatedTask.goal.split('\n')[0].substring(0, 50),
+      status: updatedTask.meta.status.toLowerCase().replace(' ', '_'),
+      current_step: updatedTask.meta.currentStep,
+      total_steps: updatedTask.meta.totalSteps,
+      assigned_tool: updatedTask.meta.assignedAI,
+      tags: updatedTask.meta.tags,
+      jira_key: updatedTask.meta.jiraKey,
+      goal: updatedTask.goal,
+      technical_details: updatedTask.technicalDetails,
+    }).catch(err => console.error('Failed to update task:', err));
   };
 
   const addTaskRelation = (sourceId: string, targetId: string, type: 'blocks' | 'blocked-by' | 'depends-on' | 'related-to') => {
@@ -41,7 +119,6 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (task.id === sourceId) {
         const target = prev.find(t => t.id === targetId);
         if (target) {
-          // Check if relation already exists
           const exists = task.meta.relations.some(r => r.targetPath === target.path && r.type === type);
           if (!exists) {
             return {
@@ -73,7 +150,10 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       toggleTag,
       updateTask,
       addTaskRelation,
-      getTaskById
+      getTaskById,
+      loading,
+      error,
+      refreshTasks,
     }}>
       {children}
     </TaskContext.Provider>
