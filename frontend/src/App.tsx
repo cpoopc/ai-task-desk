@@ -28,7 +28,7 @@ type ViewMode = 'dashboard' | 'review' | 'graph' | 'kanban' | 'archive' | 'detai
 function AppContent() {
   const [view, setView] = useState<ViewMode>('dashboard');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const { tasks, folders, sprints, activeSprintId, setActiveSprintId, activeFolderId, setActiveFolderId, activeTags, toggleTag } = useTasks();
+  const { tasks, folders, sprints, activeSprintId, setActiveSprintId, activeFolderId, setActiveFolderId, activeTags, toggleTag, useMockData, setUseMockData, error } = useTasks();
 
   const activeSprint = sprints.find(s => s.id === activeSprintId);
   
@@ -143,11 +143,24 @@ function AppContent() {
           </div>
         </div>
 
-        <div className="p-4 border-t border-slate-200">
-          <button className="flex items-center gap-2 w-full px-2 py-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors">
-            <Settings size={16} />
-            Settings
-          </button>
+        <div className="p-4 border-t border-slate-200 space-y-2">
+          {error && (
+            <div className="text-[10px] text-red-500 px-2">API Error</div>
+          )}
+          <div className="flex items-center justify-between px-2">
+            <span className="text-[11px] text-slate-500">Debug Mode</span>
+            <button
+              onClick={() => setUseMockData(!useMockData)}
+              className={`relative w-9 h-5 rounded-full transition-colors ${useMockData ? 'bg-amber-500' : 'bg-emerald-500'}`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${useMockData ? 'translate-x-4' : ''}`}
+              />
+            </button>
+          </div>
+          <div className="text-[10px] text-slate-400 px-2">
+            {useMockData ? 'Using mock data' : 'Using real API'}
+          </div>
         </div>
       </aside>
 

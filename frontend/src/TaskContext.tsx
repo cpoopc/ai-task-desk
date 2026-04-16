@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { TaskBrief, Sprint, Folder } from './types';
 import { briefsAPI, sprintsAPI, foldersAPI } from './services/api';
+import { INITIAL_TASKS, INITIAL_SPRINTS, INITIAL_FOLDERS } from './constants';
 
 interface ApiFolder {
   name: string;
@@ -25,9 +26,27 @@ interface TaskContextType {
   loading: boolean;
   error: string | null;
   refreshTasks: () => Promise<void>;
+  useMockData: boolean;
+  setUseMockData: (value: boolean) => void;
 }
 
 const TaskContext = createContext<TaskContextType | undefined>(undefined);
+
+const USE_MOCK_KEY = 'mc_use_mock_data';
+
+function loadMockPreference(): boolean {
+  try {
+    return localStorage.getItem(USE_MOCK_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function saveMockPreference(value: boolean) {
+  try {
+    localStorage.setItem(USE_MOCK_KEY, value ? 'true' : 'false');
+  } catch {}
+}
 
 export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [tasks, setTasks] = useState<TaskBrief[]>([]);
@@ -38,8 +57,14 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [activeTags, setActiveTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [useMockData, setUseMockDataState] = useState(loadMockPreference);
 
-  const refreshTasks = async () => {
+  const setUseMockData = (value: boolean) => {
+    saveMockPreference(value);
+    setUseMockDataState(value);
+  };
+
+  const loadFromAPI = async () => {
     setLoading(true);
     setError(null);
     try {
@@ -90,9 +115,30 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const loadMock = () => {
+    setTasks(INITIAL_TASKS);
+    setSprints(INITIAL_SPRINTS);
+    setFolders(INITIAL_FOLDERS);
+    setActiveSprintId(INITIAL_SPRINTS[0].id);
+    setLoading(false);
+    setError(null);
+  };
+
+  const refreshTasks = async () => {
+    if (useMockData) {
+      loadMock();
+    } else {
+      await loadFromAPI();
+    }
+  };
+
   useEffect(() => {
-    refreshTasks();
-  }, []);
+    if (useMockData) {
+      loadMock();
+    } else {
+      loadFromAPI();
+    }
+  }, [useMockData]);
 
   const toggleTag = (tag: string) => {
     setActiveTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
@@ -100,18 +146,20 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const updateTask = (updatedTask: TaskBrief) => {
     setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
-    const path = updatedTask.path;
-    briefsAPI.update(path, {
-      title: updatedTask.goal.split('\n')[0].substring(0, 50),
-      status: updatedTask.meta.status.toLowerCase().replace(' ', '_'),
-      current_step: updatedTask.meta.currentStep,
-      total_steps: updatedTask.meta.totalSteps,
-      assigned_tool: updatedTask.meta.assignedAI,
-      tags: updatedTask.meta.tags,
-      jira_key: updatedTask.meta.jiraKey,
-      goal: updatedTask.goal,
-      technical_details: updatedTask.technicalDetails,
-    }).catch(err => console.error('Failed to update task:', err));
+    if (!useMockData) {
+      const path = updatedTask.path;
+      briefsAPI.update(path, {
+        title: updatedTask.goal.split('\n')[0].substring(0, 50),
+        status: updatedTask.meta.status.toLowerCase().replace(' ', '_'),
+        current_step: updatedTask.meta.currentStep,
+        total_steps: updatedTask.meta.totalSteps,
+        assigned_tool: updatedTask.meta.assignedAI,
+        tags: updatedTask.meta.tags,
+        jira_key: updatedTask.meta.jiraKey,
+        goal: updatedTask.goal,
+        technical_details: updatedTask.technicalDetails,
+      }).catch(err => console.error('Failed to update task:', err));
+    }
   };
 
   const addTaskRelation = (sourceId: string, targetId: string, type: 'blocks' | 'blocked-by' | 'depends-on' | 'related-to') => {
@@ -154,6 +202,8 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       loading,
       error,
       refreshTasks,
+      useMockData,
+      setUseMockData,
     }}>
       {children}
     </TaskContext.Provider>
