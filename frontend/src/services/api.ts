@@ -284,6 +284,158 @@ export const focusAPI = {
   getFocusItems: () => fetchJSON<FocusItem[]>(`${API_BASE}/briefs/focus`),
 };
 
+// Contacts API
+export interface ContactResponse {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  jira_account: string | null;
+  slack_id: string | null;
+  avatar_url: string | null;
+  created_at: string;
+}
+
+export interface CreateContactRequest {
+  name: string;
+  email: string;
+  role?: string;
+  jira_account?: string;
+  slack_id?: string;
+  avatar_url?: string;
+}
+
+export const contactsAPI = {
+  list: () => fetchJSON<ContactResponse[]>(`${API_BASE}/contacts`),
+
+  create: (data: CreateContactRequest) =>
+    fetchJSON<ContactResponse>(`${API_BASE}/contacts`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (id: string, data: Partial<CreateContactRequest>) =>
+    fetchJSON<ContactResponse>(`${API_BASE}/contacts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: string) =>
+    fetchJSON<{ status: string }>(`${API_BASE}/contacts/${id}`, { method: 'DELETE' }),
+
+  importFromJira: (contacts: Array<{ displayName: string; emailAddress: string; accountId: string }>) =>
+    fetchJSON<ContactResponse[]>(`${API_BASE}/contacts/import/jira`, {
+      method: 'POST',
+      body: JSON.stringify({ contacts }),
+    }),
+
+  importFromSlack: (members: Array<{ real_name: string; email: string; id: string }>) =>
+    fetchJSON<ContactResponse[]>(`${API_BASE}/contacts/import/slack`, {
+      method: 'POST',
+      body: JSON.stringify({ members }),
+    }),
+};
+
+// Auth API
+export interface UserResponse {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: UserResponse;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  email: string;
+  name: string;
+  password: string;
+  role?: string;
+}
+
+const TOKEN_KEY = 'mc_auth_token';
+
+export const authAPI = {
+  login: (data: LoginRequest) =>
+    fetchJSON<AuthResponse>(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  register: (data: RegisterRequest) =>
+    fetchJSON<AuthResponse>(`${API_BASE}/auth/register`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  sendInvite: (email: string, role: string = 'member') =>
+    fetchJSON<{ status: string; email: string }>(`${API_BASE}/auth/invite`, {
+      method: 'POST',
+      body: JSON.stringify({ email, role }),
+    }),
+
+  getMe: () => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    return fetchJSON<UserResponse>(`${API_BASE}/auth/me`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+  },
+
+  saveToken: (token: string) => localStorage.setItem(TOKEN_KEY, token),
+
+  getToken: () => localStorage.getItem(TOKEN_KEY),
+
+  clearToken: () => localStorage.removeItem(TOKEN_KEY),
+};
+
+// Notifications API
+export interface NotificationResponse {
+  id: string;
+  user_id: string;
+  title: string;
+  message: string;
+  notification_type: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface SlackWebhookRequest {
+  webhook_url: string;
+  message: string;
+}
+
+export const notificationsAPI = {
+  list: (userId: string = 'default', unreadOnly: boolean = false) =>
+    fetchJSON<NotificationResponse[]>(`${API_BASE}/notifications?user_id=${userId}&unread_only=${unreadOnly}`),
+
+  markAsRead: (notificationId: string) =>
+    fetchJSON<{ status: string }>(`${API_BASE}/notifications/${notificationId}/read`, { method: 'PUT' }),
+
+  markAllRead: (userId: string = 'default') =>
+    fetchJSON<{ marked_read: number }>(`${API_BASE}/notifications/read-all?user_id=${userId}`, { method: 'PUT' }),
+
+  sendSlack: (webhookUrl: string, message: string) =>
+    fetchJSON<{ status: string }>(`${API_BASE}/notifications/webhook`, {
+      method: 'POST',
+      body: JSON.stringify({ webhook_url: webhookUrl, message }),
+    }),
+
+  send: (userId: string, title: string, message: string, notificationType: string = 'info') =>
+    fetchJSON<NotificationResponse>(`${API_BASE}/notifications/send?user_id=${userId}&title=${encodeURIComponent(title)}&message=${encodeURIComponent(message)}&notification_type=${notificationType}`, {
+      method: 'POST',
+    }),
+};
+
 // Helper to convert backend Brief to frontend TaskBrief format
 export function briefToTask(brief: BriefDetailResponse): TaskBrief {
   return {

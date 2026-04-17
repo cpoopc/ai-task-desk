@@ -55,6 +55,10 @@ class Brief(BaseModel):
 
     relations: list[str] = Field(default_factory=list)
 
+    owner_id: Optional[str] = None
+    reviewer_id: Optional[str] = None
+    collaborator_ids: list[str] = Field(default_factory=list)
+
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_active_at: Optional[datetime] = None
     indexed_at: Optional[datetime] = None
@@ -109,3 +113,34 @@ class BriefFilters(BaseModel):
     tag: Optional[str] = None
     status: Optional[str] = None
     search: Optional[str] = None
+
+
+class Contact(BaseModel):
+    id: str
+    name: str
+    email: str
+    role: str = "member"
+    jira_account: Optional[str] = None
+    slack_id: Optional[str] = None
+    avatar_url: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class User(BaseModel):
+    id: str
+    email: str
+    name: str
+    password_hash: str
+    role: str = "member"
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class UserNotification(BaseModel):
+    id: str
+    user_id: str
+    title: str
+    message: str
+    notification_type: str = "info"
+    is_read: bool = False
+    created_at: datetime = Field(default_factory=datetime.utcnow)

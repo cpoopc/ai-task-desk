@@ -5,7 +5,17 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from mission_control.config import get_settings
 from mission_control.db.session import init_db
-from mission_control.api.routes import briefs, folders, sprints, review, plan, search
+from mission_control.api.routes import (
+    briefs,
+    folders,
+    sprints,
+    review,
+    plan,
+    search,
+    contacts,
+    auth,
+    notifications,
+)
 
 
 @asynccontextmanager
@@ -38,6 +48,9 @@ def create_app() -> FastAPI:
     app.include_router(review.router)
     app.include_router(plan.router)
     app.include_router(search.router)
+    app.include_router(contacts.router)
+    app.include_router(auth.router)
+    app.include_router(notifications.router)
 
     @app.get("/api/health")
     async def health_check():

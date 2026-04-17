@@ -269,3 +269,86 @@ class RelationsUpdate(BaseModel):
 class RebuildIndexResponse(BaseModel):
     total: int
     sprints: int
+
+
+class ContactCreate(BaseModel):
+    name: str
+    email: str
+    role: str = "member"
+    jira_account: Optional[str] = None
+    slack_id: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+
+class ContactUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    role: Optional[str] = None
+    jira_account: Optional[str] = None
+    slack_id: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+
+class ContactResponse(BaseModel):
+    id: str
+    name: str
+    email: str
+    role: str
+    jira_account: Optional[str] = None
+    slack_id: Optional[str] = None
+    avatar_url: Optional[str] = None
+    created_at: datetime
+
+
+class JiraImportRequest(BaseModel):
+    contacts: list[dict]
+
+
+class SlackImportRequest(BaseModel):
+    members: list[dict]
+
+
+class UserCreate(BaseModel):
+    email: str
+    name: str
+    password: str
+    role: str = "member"
+
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    name: str
+    role: str
+    is_active: bool
+    created_at: datetime
+
+
+class InviteRequest(BaseModel):
+    email: str
+    role: str = "member"
+
+
+class AuthResponse(BaseModel):
+    token: str
+    user: UserResponse
+
+
+class NotificationResponse(BaseModel):
+    id: str
+    user_id: str
+    title: str
+    message: str
+    notification_type: str
+    is_read: bool
+    created_at: datetime
+
+
+class SlackWebhookRequest(BaseModel):
+    webhook_url: str
+    message: str

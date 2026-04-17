@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     jira_username: str | None = None
     jira_api_token: str | None = None
 
+    sync_enabled: bool = False
+    sync_interval: int = 300
+
 
 @lru_cache
 def get_settings() -> Settings:
