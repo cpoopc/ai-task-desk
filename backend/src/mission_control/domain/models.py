@@ -53,6 +53,8 @@ class Brief(BaseModel):
     checklist_total: int = 0
     checklist_done: int = 0
 
+    relations: list[str] = Field(default_factory=list)
+
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_active_at: Optional[datetime] = None
     indexed_at: Optional[datetime] = None

@@ -1,0 +1,54 @@
+#!/bin/bash
+# post-commit hook for Mission Control
+# Creates ReviewItem entries for AI tool changes
+
+MARKER_FILE=".mc/git_hooks/pending_ai_changes.txt"
+
+if [ -f "$MARKER_FILE" ]; then
+    echo "Processing AI tool configuration changes..."
+
+    CHANGED_FILES=$(cat "$MARKER_FILE")
+    COMMIT_SHA=$(git rev-parse HEAD)
+    COMMIT_MSG=$(git log -1 --format=%s)
+
+    echo "Commit: $COMMIT_SHA"
+    echo "Message: $COMMIT_MSG"
+    echo "Changed AI files:"
+    echo "$CHANGED_FILES"
+
+    # Create review items for each AI file
+    # In a real implementation, this would call the backend API
+    # For now, we demonstrate the concept with a JSON file
+
+    REVIEW_DATA_DIR=".mc/reviews"
+    mkdir -p "$REVIEW_DATA_DIR"
+
+    TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+    for FILE in $CHANGED_FILES; do
+        REVIEW_ITEM=$(cat <<EOF
+{
+  "id": "review-\$(date +%s)-\$(echo $FILE | tr '/' '-')",
+  "brief_path": "$(git rev-parse --show-toplevel | xargs basename)",
+  "agent_tool": "git-hook",
+  "status": "pending",
+  "diff_summary": "AI tool config changed: $FILE",
+  "files_changed": [{"path": "$FILE", "change_type": "modified"}],
+  "intent_checks": [],
+  "submitted_at": "$TIMESTAMP",
+  "reviewed_at": null
+}
+EOF
+)
+
+        echo "$REVIEW_ITEM" >> "$REVIEW_DATA_DIR/pending_reviews.jsonl"
+        echo "Created review item for: $FILE"
+    done
+
+    rm "$MARKER_FILE"
+    echo "AI change review items created successfully."
+else
+    echo "No pending AI tool changes to process."
+fi
+
+exit 0

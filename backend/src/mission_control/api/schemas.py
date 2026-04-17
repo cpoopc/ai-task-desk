@@ -21,6 +21,7 @@ class BriefUpdate(BaseModel):
     goal: Optional[str] = None
     technical_details: Optional[str] = None
     constraints: Optional[list[str]] = None
+    relations: Optional[list[str]] = None
 
 
 class ChecklistUpdateItem(BaseModel):
@@ -60,6 +61,7 @@ class BriefDetailResponse(BriefResponse):
     parent_task_path: Optional[str] = None
     last_active_at: Optional[datetime] = None
     indexed_at: Optional[datetime] = None
+    relations: list[str] = []
 
 
 class DashboardStats(BaseModel):
@@ -188,12 +190,17 @@ class GraphNode(BaseModel):
 class GraphEdge(BaseModel):
     source: str
     target: str
-    score: float
+    type: str
+    score: float = 0.0
 
 
 class GraphData(BaseModel):
     nodes: list[GraphNode] = []
     edges: list[GraphEdge] = []
+
+
+class RelationsUpdate(BaseModel):
+    relations: list[str]
 
 
 class RebuildIndexResponse(BaseModel):

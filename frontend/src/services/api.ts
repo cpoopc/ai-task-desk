@@ -46,6 +46,7 @@ export interface BriefDetailResponse extends BriefResponse {
   parent_task_path: string | null;
   last_active_at: string | null;
   indexed_at: string | null;
+  relations: string[];
 }
 
 export interface DashboardStats {
@@ -103,6 +104,7 @@ export interface UpdateBriefRequest {
   goal?: string;
   technical_details?: string;
   constraints?: string[];
+  relations?: string[];
 }
 
 // Briefs API
@@ -133,6 +135,12 @@ export const briefsAPI = {
 
   delete: (path: string) =>
     fetchJSON<{ status: string }>(`${API_BASE}/briefs/${path}`, { method: 'DELETE' }),
+
+  updateRelations: (path: string, relations: string[]) =>
+    fetchJSON<{ relations: string[] }>(`${API_BASE}/briefs/${path}/relations`, {
+      method: 'PUT',
+      body: JSON.stringify({ relations }),
+    }),
 
   stats: () => fetchJSON<DashboardStats>(`${API_BASE}/briefs/stats`),
 
@@ -215,7 +223,7 @@ export const reviewsAPI = {
 export const searchAPI = {
   search: (q: string) => fetchJSON<Array<{ id: string; title: string; folder_path: string; status: string; score: number }>>(`${API_BASE}/search?q=${encodeURIComponent(q)}`),
 
-  getGraph: (sprint?: string) => fetchJSON<{ nodes: Array<{ id: string; title: string; path: string; status: string }>; edges: Array<{ source: string; target: string; score: number }> }>(`${API_BASE}/graph${sprint ? `?sprint=${sprint}` : ''}`),
+  getGraph: (sprint?: string) => fetchJSON<{ nodes: Array<{ id: string; title: string; path: string; status: string }>; edges: Array<{ source: string; target: string; type: string; score: number }> }>(`${API_BASE}/graph${sprint ? `?sprint=${sprint}` : ''}`),
 
   detectLinks: () => fetchJSON<{ total_links: number; auto_links: number; suggested_links: number }>(`${API_BASE}/links/detect`, { method: 'POST' }),
 };

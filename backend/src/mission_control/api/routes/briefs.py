@@ -14,6 +14,7 @@ from mission_control.api.schemas import (
     FocusItem,
     ChecklistUpdateItem,
     DecisionCreate,
+    RelationsUpdate,
 )
 from mission_control.adapters.filesystem import FileSystemAdapter
 
@@ -121,6 +122,7 @@ async def get_brief(
         parent_task_path=brief.parent_task_path,
         last_active_at=brief.last_active_at,
         indexed_at=brief.indexed_at,
+        relations=brief.relations,
     )
 
 
@@ -213,6 +215,20 @@ async def add_decision(
     return {"decision": new_decision.model_dump()}
 
 
+@router.put("/{path:path}/relations")
+async def update_relations(
+    path: str,
+    data: RelationsUpdate,
+    service: BriefService = Depends(get_brief_service),
+):
+    brief = await service.get_by_path(path)
+    if not brief:
+        raise HTTPException(status_code=404, detail="Brief not found")
+    brief.relations = data.relations
+    await service.repository.save(brief)
+    return {"relations": brief.relations}
+
+
 @router.post("/{path:path}/export")
 async def export_context(
     path: str,
@@ -255,3 +271,31 @@ async def rebuild_index(
 ):
     result = await service.rebuild_index()
     return result
+
+
+@router.get("/{path:path}/subtasks", response_model=list[BriefResponse])
+async def get_subtasks(
+    path: str,
+    service: BriefService = Depends(get_brief_service),
+):
+    briefs = await service.list(None)
+    subtasks = [b for b in briefs if b.parent_task_path == path]
+    return [
+        BriefResponse(
+            id=b.id,
+            folder_path=b.folder_path,
+            title=b.title,
+            status=b.status.value if hasattr(b.status, "value") else b.status,
+            current_step=b.current_step,
+            total_steps=b.total_steps,
+            assigned_tool=b.assigned_tool,
+            sprint_name=b.sprint_name,
+            folder_name=b.folder_name,
+            tags=b.tags,
+            checklist_total=b.checklist_total,
+            checklist_done=b.checklist_done,
+            jira_key=b.jira_key,
+            created_at=b.created_at,
+        )
+        for b in subtasks
+    ]

@@ -1,11 +1,10 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  ReactFlow, 
-  Background, 
-  Controls, 
-  addEdge, 
-  applyNodeChanges, 
+import {
+  ReactFlow,
+  Background,
+  Controls,
+  applyNodeChanges,
   applyEdgeChanges,
   Node,
   Edge,
@@ -15,37 +14,71 @@ import {
   Panel
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useTasks } from '../TaskContext';
-import { TaskBrief, Relation } from '../types';
+import { searchAPI } from '../services/api';
 import { Bot, Layers, Layout, List as ListIcon, Trash2, MousePointer2, GitCommitHorizontal } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-// --- Custom Task Node ---
-const TaskNode = ({ data }: { data: TaskBrief }) => {
+interface GraphNode {
+  id: string;
+  title: string;
+  path: string;
+  status: string;
+}
+
+interface GraphEdge {
+  source: string;
+  target: string;
+  type: string;
+  score: number;
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  'drafting': '#94a3b8',
+  'in_progress': '#f59e0b',
+  'review': '#10b981',
+  'done': '#6b7280',
+  'blocked': '#ef4444',
+};
+
+const EDGE_COLORS: Record<string, string> = {
+  'blocks': '#EF4444',
+  'depends-on': '#f97316',
+  'related-to': '#9ca3af',
+  'linked': '#534AB7',
+};
+
+const STATUS_BORDER_COLORS: Record<string, string> = {
+  'Blocked': '#ef4444',
+  'Review': '#10b981',
+  'In progress': '#f59e0b',
+  'AI working': '#3b82f6',
+  'Done': '#6b7280',
+  'Backlog': '#94a3b8',
+};
+
+const SimpleTaskNode = ({ data, onClick }: { data: GraphNode; onClick?: () => void }) => {
   return (
-    <div className={cn(
-      "w-[180px] bg-white border border-border rounded-lg shadow-sm hover:border-primary/50 transition-all p-3",
-      data.meta.status === 'Blocked' && "border-l-4 border-l-error",
-      data.meta.status === 'Review' && "border-l-4 border-l-success",
-      data.meta.status === 'In progress' && "border-l-4 border-l-warning",
-      data.meta.status === 'AI working' && "border-l-4 border-l-info"
-    )}>
+    <div
+      className="w-[180px] bg-white border border-border rounded-lg shadow-sm hover:border-primary/50 transition-all p-3 cursor-pointer"
+      style={{ borderLeftWidth: 4, borderLeftColor: STATUS_BORDER_COLORS[data.status] || '#e5e7eb' }}
+      onClick={onClick}
+    >
       <Handle type="target" position={Position.Top} className="w-2 h-2 bg-slate-300" />
       <div className="space-y-1">
         <div className="flex items-center justify-between">
           <span className="text-[9px] font-mono text-text-muted uppercase truncate max-w-[80px]">
-            {data.meta.jiraKey || data.path.split('/').pop()}
+            {data.path.split('/').pop()}
           </span>
-          {data.meta.assignedAI && (
-            <Bot size={10} className="text-info" />
-          )}
         </div>
         <h4 className="text-[11px] font-bold text-text-main line-clamp-2 leading-tight">
-          {data.goal}
+          {data.title}
         </h4>
         <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-50 mt-1.5">
-          <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: data.meta.status === 'Done' ? '#10b981' : '#e5e7eb' }} />
-          <span className="text-[9px] text-text-muted font-bold uppercase">{data.meta.status}</span>
+          <div
+            className="w-1.5 h-1.5 rounded-full"
+            style={{ backgroundColor: STATUS_COLORS[data.status] || '#e5e7eb' }}
+          />
+          <span className="text-[9px] text-text-muted font-bold uppercase">{data.status}</span>
         </div>
       </div>
       <Handle type="source" position={Position.Bottom} className="w-2 h-2 bg-primary" />
@@ -54,47 +87,62 @@ const TaskNode = ({ data }: { data: TaskBrief }) => {
 };
 
 const nodeTypes = {
-  task: TaskNode,
+  task: SimpleTaskNode,
 };
 
-// --- Task Graph Component ---
-export default function TaskGraph() {
-  const { tasks, addTaskRelation } = useTasks();
+interface TaskGraphProps {
+  onOpenTask?: (taskPath: string) => void;
+}
+
+export default function TaskGraph({ onOpenTask }: TaskGraphProps) {
   const [view, setView] = useState<'graph' | 'text'>('graph');
   const [mode, setMode] = useState<'move' | 'connect'>('move');
   const [nodes, setNodes] = useState<Node<any>[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  // Initialize nodes and edges from tasks
+  const loadGraphData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const graphData = await searchAPI.getGraph();
+
+      const newNodes: Node<any>[] = graphData.nodes.map((n, idx) => ({
+        id: n.id,
+        type: 'task',
+        position: { x: (idx % 4) * 250, y: Math.floor(idx / 4) * 160 },
+        data: { ...n, onClick: () => onOpenTask?.(n.path) },
+      }));
+
+      const nodeIds = new Set(graphData.nodes.map(n => n.id));
+      const newEdges: Edge[] = graphData.edges
+        .filter(e => nodeIds.has(e.source) && nodeIds.has(e.target))
+        .map((e, idx) => ({
+          id: `edge-${e.source}-${e.target}-${idx}`,
+          source: e.source,
+          target: e.target,
+          label: e.type,
+          labelStyle: { fontSize: 8, fill: '#94a3b8', fontWeight: 700 },
+          style: {
+            stroke: EDGE_COLORS[e.type] || '#9ca3af',
+            strokeWidth: 2,
+          },
+          animated: e.type === 'depends-on',
+        }));
+
+      setNodes(newNodes);
+      setEdges(newEdges);
+    } catch (err) {
+      console.error('Failed to load graph data:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [onOpenTask]);
+
   useEffect(() => {
-    const newNodes: Node<any>[] = tasks.map((t, idx) => ({
-      id: t.id,
-      type: 'task',
-      position: { x: (idx % 3) * 220, y: Math.floor(idx / 3) * 140 }, // Simple grid layout
-      data: t as any,
-    }));
-
-    const newEdges: Edge[] = [];
-    tasks.forEach(t => {
-      t.meta.relations.forEach((rel, rIdx) => {
-        const target = tasks.find(other => other.path === rel.targetPath);
-        if (target) {
-          newEdges.push({
-            id: `edge-${t.id}-${target.id}-${rIdx}`,
-            source: t.id,
-            target: target.id,
-            label: rel.type,
-            labelStyle: { fontSize: 8, fill: '#94a3b8', fontWeight: 700 },
-            style: { stroke: rel.type === 'blocks' ? '#EF4444' : '#534AB7' },
-            animated: rel.type === 'depends-on',
-          });
-        }
-      });
-    });
-
-    setNodes(newNodes);
-    setEdges(newEdges);
-  }, [tasks]);
+    if (view === 'graph') {
+      loadGraphData();
+    }
+  }, [view, loadGraphData]);
 
   const onNodesChange = useCallback(
     (changes: any) => setNodes((nds) => applyNodeChanges(changes, nds)),
@@ -107,11 +155,9 @@ export default function TaskGraph() {
 
   const onConnect = useCallback(
     (params: Connection) => {
-      if (params.source && params.target) {
-        addTaskRelation(params.source, params.target, 'blocks');
-      }
+      console.log('Connection attempted:', params);
     },
-    [addTaskRelation]
+    []
   );
 
   return (
@@ -119,14 +165,14 @@ export default function TaskGraph() {
       {/* Header */}
       <div className="flex items-center justify-between pb-4 border-b border-border">
         <div>
-          <h2 className="text-[16px] font-bold text-text-main tracking-tight">Interactive Graph</h2>
-          <p className="text-[11px] text-text-muted">Connect nodes to define blockers and dependencies.</p>
+          <h2 className="text-[16px] font-bold text-text-main tracking-tight">Task Dependencies</h2>
+          <p className="text-[11px] text-text-muted">Visualize task relationships and blockers.</p>
         </div>
-        
+
         <div className="flex bg-slate-100 p-1 rounded-md">
            {view === 'graph' && (
              <div className="flex gap-1 pr-1 mr-1 border-r border-slate-200">
-                <button 
+                <button
                   onClick={() => setMode('move')}
                   title="Move Objects"
                   className={cn(
@@ -136,7 +182,7 @@ export default function TaskGraph() {
                 >
                   <MousePointer2 size={12} /> MOVE
                 </button>
-                <button 
+                <button
                   onClick={() => setMode('connect')}
                   title="Connect Relations"
                   className={cn(
@@ -148,7 +194,7 @@ export default function TaskGraph() {
                 </button>
              </div>
            )}
-           <button 
+           <button
              onClick={() => setView('graph')}
              className={cn(
                "flex items-center gap-2 px-3 py-1.5 rounded-md text-[10px] font-bold transition-all",
@@ -157,7 +203,7 @@ export default function TaskGraph() {
            >
              <Layout size={14} /> GRAPHICAL
            </button>
-           <button 
+           <button
              onClick={() => setView('text')}
              className={cn(
                "flex items-center gap-2 px-3 py-1.5 rounded-md text-[10px] font-bold transition-all",
@@ -173,7 +219,11 @@ export default function TaskGraph() {
         "flex-1 card overflow-hidden relative bg-white border-border/50",
         mode === 'connect' && "ring-2 ring-error/20 ring-inset"
       )}>
-        {view === 'graph' ? (
+        {loading ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-text-muted">Loading graph data...</p>
+          </div>
+        ) : view === 'graph' ? (
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -191,45 +241,58 @@ export default function TaskGraph() {
             <Background color={mode === 'connect' ? "#fff7f7" : "#f1f5f9"} gap={20} />
             <Controls />
             <Panel position="top-right" className="bg-white/80 backdrop-blur border border-border p-2 rounded-lg text-[10px] font-bold text-text-muted space-y-1">
-               <div className="flex items-center gap-2"><div className="w-2 h-0.5 bg-error" /> Blocks</div>
-               <div className="flex items-center gap-2"><div className="w-2 h-0.5 bg-primary" /> Relates to</div>
+               <div className="flex items-center gap-2"><div className="w-3 h-0.5 bg-error" /> Blocks</div>
+               <div className="flex items-center gap-2"><div className="w-3 h-0.5 bg-orange-500" /> Depends on</div>
+               <div className="flex items-center gap-2"><div className="w-3 h-0.5 bg-gray-400" /> Related to</div>
             </Panel>
           </ReactFlow>
         ) : (
-          <div className="p-6 h-full overflow-y-auto space-y-6">
-            {tasks.map(task => (
-              <div key={task.id} className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono text-text-muted uppercase">{task.path}</span>
-                    <h3 className="text-sm font-bold text-text-main">{task.goal}</h3>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {task.meta.relations.map((rel, i) => (
-                    <div key={i} className="flex items-center justify-between bg-slate-50 border border-slate-100 p-3 rounded-md">
-                      <div className="flex items-center gap-3">
-                        <span className={cn(
-                          "text-[9px] font-bold uppercase py-0.5 px-1.5 rounded",
-                          rel.type === 'blocks' ? "bg-red-100 text-red-600" : "bg-blue-100 text-blue-600"
-                        )}>
-                          {rel.type}
-                        </span>
-                        <span className="text-[11px] font-medium text-text-main">{rel.targetPath}</span>
-                      </div>
-                      <button className="text-text-muted hover:text-error transition-colors">
-                        <Trash2 size={14} />
-                      </button>
+          <div className="p-6 h-full overflow-y-auto space-y-4">
+            {nodes.map(node => {
+              const nodeEdges = edges.filter(e => e.source === node.id || e.target === node.id);
+              return (
+                <div key={node.id} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono text-text-muted uppercase">{node.data.path}</span>
+                      <h3 className="text-sm font-bold text-text-main">{node.data.title}</h3>
                     </div>
-                  ))}
-                  <button className="flex items-center justify-center p-3 border border-dashed border-slate-200 rounded-md text-[10px] font-bold text-text-muted hover:border-primary/30 hover:text-primary transition-all">
-                    + ADD RELATION
-                  </button>
+                    <span className={cn(
+                      "text-[9px] font-bold uppercase px-2 py-0.5 rounded",
+                      node.data.status === 'Blocked' ? "bg-red-100 text-red-600" :
+                      node.data.status === 'Review' ? "bg-green-100 text-green-600" :
+                      node.data.status === 'in_progress' ? "bg-amber-100 text-amber-600" :
+                      "bg-slate-100 text-slate-600"
+                    )}>
+                      {node.data.status}
+                    </span>
+                  </div>
+
+                  {nodeEdges.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {nodeEdges.map((edge, i) => (
+                        <div key={i} className="flex items-center justify-between bg-slate-50 border border-slate-100 p-2 rounded-md">
+                          <div className="flex items-center gap-2">
+                            <span className={cn(
+                              "text-[9px] font-bold uppercase py-0.5 px-1.5 rounded",
+                              edge.label === 'blocks' ? "bg-red-100 text-red-600" :
+                              edge.label === 'depends-on' ? "bg-orange-100 text-orange-600" :
+                              "bg-gray-100 text-gray-600"
+                            )}>
+                              {edge.label}
+                            </span>
+                            <span className="text-[11px] font-medium text-text-main">
+                              {edge.source === node.id ? edge.target : edge.source}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="h-px bg-slate-100 mt-4" />
                 </div>
-                <div className="h-px bg-slate-50 mt-6" />
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

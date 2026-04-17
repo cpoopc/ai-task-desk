@@ -30,6 +30,11 @@ export interface Relation {
   targetPath: string;
 }
 
+export interface TaskRelation {
+  type: 'blocks' | 'depends-on' | 'related-to';
+  targetPath: string;
+}
+
 export interface ChecklistItem {
   id: string;
   text: string;

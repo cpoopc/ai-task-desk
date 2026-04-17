@@ -100,10 +100,27 @@ async def get_dependency_graph(
         GraphEdge(
             source=l.source_path,
             target=l.target_path,
+            type="linked",
             score=l.score,
         )
         for l in links
     ]
+
+    brief_paths = {b.folder_path for b in briefs}
+    for brief in briefs:
+        for relation in brief.relations:
+            if ":" not in relation:
+                continue
+            rel_type, target_path = relation.split(":", 1)
+            if target_path in brief_paths:
+                edges.append(
+                    GraphEdge(
+                        source=brief.folder_path,
+                        target=target_path,
+                        type=rel_type,
+                        score=1.0,
+                    )
+                )
 
     return GraphData(nodes=nodes, edges=edges)
 

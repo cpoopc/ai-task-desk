@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { useTasks } from '../TaskContext';
 import { cn } from '../lib/utils';
 import { TaskStatus } from '../types';
+import { ChevronRight, ChevronDown } from 'lucide-react';
 
 interface DashboardProps {
   onOpenTask: (taskId: string) => void;
@@ -17,14 +18,62 @@ const STATUS_TAG_CLASSES: Record<TaskStatus, string> = {
   'Done': 'bg-slate-50 text-slate-400',
 };
 
+interface TaskWithHierarchy {
+  task: ReturnType<typeof useTasks>['tasks'][0];
+  depth: number;
+  isSubtask: boolean;
+  parentPath: string | null;
+}
+
 export default function Dashboard({ onOpenTask }: DashboardProps) {
   const { tasks, focusItems, activeFolderId, activeTags } = useTasks();
+  const [collapsedTasks, setCollapsedTasks] = useState<Set<string>>(new Set());
 
-  const filteredTasks = tasks.filter(task => {
-    const matchesFolder = activeFolderId === 'all' || task.path.startsWith(activeFolderId);
-    const matchesTags = activeTags.length === 0 || activeTags.every(tag => task.meta.tags.includes(tag));
-    return matchesFolder && matchesTags;
-  });
+  const toggleCollapse = (path: string) => {
+    setCollapsedTasks(prev => {
+      const next = new Set(prev);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
+  };
+
+  const tasksWithHierarchy = useMemo((): TaskWithHierarchy[] => {
+    const filteredTasks = tasks.filter(task => {
+      const matchesFolder = activeFolderId === 'all' || task.path.startsWith(activeFolderId);
+      const matchesTags = activeTags.length === 0 || activeTags.every(tag => task.meta.tags.includes(tag));
+      return matchesFolder && matchesTags;
+    });
+
+    const pathToTask = new Map(filteredTasks.map(t => [t.path, t]));
+    const result: TaskWithHierarchy[] = [];
+
+    for (const task of filteredTasks) {
+      const pathParts = task.path.split('/');
+      let depth = 0;
+      let parentPath: string | null = null;
+
+      if (pathParts.length > 3) {
+        parentPath = pathParts.slice(0, -1).join('/');
+        const parentTask = pathToTask.get(parentPath);
+        if (parentTask) {
+          depth = 1;
+        }
+      }
+
+      result.push({
+        task,
+        depth,
+        isSubtask: depth > 0,
+        parentPath,
+      });
+    }
+
+    return result;
+  }, [tasks, activeFolderId, activeTags]);
 
   const getSubtitle = (status: string) => {
     switch (status) {
@@ -99,7 +148,7 @@ export default function Dashboard({ onOpenTask }: DashboardProps) {
       {/* Layer 2: Active Tasks */}
       <section className="flex-1 flex flex-col min-h-0 space-y-3">
         <h2 className="text-[12px] font-bold text-text-muted uppercase tracking-wider pl-1">Active Tasks</h2>
-        
+
         <div className="bg-white border border-border rounded-lg flex-1 flex flex-col overflow-hidden">
           {/* Header */}
           <div className="grid grid-cols-[32px_1fr_120px_100px_100px] gap-4 px-4 py-2.5 border-b border-border bg-slate-50/50 text-[11px] font-bold text-text-muted uppercase tracking-wider shrink-0">
@@ -112,30 +161,58 @@ export default function Dashboard({ onOpenTask }: DashboardProps) {
 
           {/* List Content */}
           <div className="flex-1 overflow-y-auto">
-            {filteredTasks.map(task => (
-              <div 
-                key={task.id}
-                onClick={() => onOpenTask(task.id)}
-                className="grid grid-cols-[32px_1fr_120px_100px_100px] gap-4 px-4 py-2.5 border-b border-slate-50 items-center text-[13px] hover:bg-bg cursor-pointer group transition-colors last:border-0"
-              >
-                <span><input type="checkbox" className="rounded" onClick={(e) => e.stopPropagation()} /></span>
-                <span className="text-text-main font-medium group-hover:text-primary transition-colors truncate">
-                  {task.goal}
-                </span>
-                <span>
-                  <span className={cn("status-tag", STATUS_TAG_CLASSES[task.meta.status])}>
-                    {task.meta.status}
+            {tasksWithHierarchy
+              .filter(({ task, isSubtask, parentPath }) => {
+                if (isSubtask && parentPath && collapsedTasks.has(parentPath)) {
+                  return false;
+                }
+                return true;
+              })
+              .map(({ task, depth }) => (
+                <div
+                  key={task.id}
+                  onClick={() => onOpenTask(task.id)}
+                  className="grid grid-cols-[32px_1fr_120px_100px_100px] gap-4 px-4 py-2.5 border-b border-slate-50 items-center text-[13px] hover:bg-bg cursor-pointer group transition-colors last:border-0"
+                  style={{ paddingLeft: `${16 + depth * 24}px` }}
+                >
+                  <span className="flex items-center gap-1">
+                    {depth > 0 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleCollapse(task.path);
+                        }}
+                        className="p-0.5 hover:bg-slate-100 rounded"
+                      >
+                        {collapsedTasks.has(task.path) ? (
+                          <ChevronRight size={14} className="text-text-muted" />
+                        ) : (
+                          <ChevronDown size={14} className="text-text-muted" />
+                        )}
+                      </button>
+                    )}
+                    <input type="checkbox" className="rounded" onClick={(e) => e.stopPropagation()} />
                   </span>
-                </span>
-                <span className="text-text-muted font-medium">
-                  {task.meta.assignedAI || '-'}
-                </span>
-                <span className="font-mono text-[10px] text-text-muted">
-                  {task.meta.jiraKey || '-'}
-                </span>
-              </div>
-            ))}
-            
+                  <span className="text-text-main font-medium group-hover:text-primary transition-colors truncate flex items-center gap-2">
+                    {depth > 0 && (
+                      <span className="text-[10px] text-text-muted font-mono">↳</span>
+                    )}
+                    {task.goal}
+                  </span>
+                  <span>
+                    <span className={cn("status-tag", STATUS_TAG_CLASSES[task.meta.status])}>
+                      {task.meta.status}
+                    </span>
+                  </span>
+                  <span className="text-text-muted font-medium">
+                    {task.meta.assignedAI || '-'}
+                  </span>
+                  <span className="font-mono text-[10px] text-text-muted">
+                    {task.meta.jiraKey || '-'}
+                  </span>
+                </div>
+              ))}
+
             {/* Simulation of a "Done" task as per design */}
             <div className="grid grid-cols-[32px_1fr_120px_100px_100px] gap-4 px-4 py-2.5 border-b border-slate-50 items-center text-[13px] opacity-40 hover:bg-bg cursor-pointer truncate last:border-0">
               <span><input type="checkbox" checked readOnly className="rounded" /></span>
