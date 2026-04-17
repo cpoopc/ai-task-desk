@@ -34,7 +34,7 @@ import LivingPlan from './components/LivingPlan';
 import FolderModal from './components/FolderModal';
 import SprintSummaryModal from './components/SprintSummaryModal';
 import { TaskBrief } from './types';
-import { searchAPI } from './services/api';
+import { searchAPI, briefsAPI } from './services/api';
 
 type ViewMode = 'dashboard' | 'review' | 'graph' | 'kanban' | 'archive' | 'detail' | 'plan';
 
@@ -574,10 +574,20 @@ function AppContent() {
               <Bell size={18} />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-error rounded-full border-2 border-white" />
             </button>
-            <button 
-              onClick={() => {
-                setSelectedTaskId(null);
-                setView('detail');
+            <button
+              onClick={async () => {
+                try {
+                  const newBrief = await briefsAPI.create({
+                    sprint: activeSprintId,
+                    folder: 'new',
+                    name: 'New Brief',
+                    template_type: 'default'
+                  });
+                  setSelectedTaskId(newBrief.folder_path);
+                  setView('detail');
+                } catch (error) {
+                  console.error('Failed to create brief:', error);
+                }
               }}
               className="btn btn-primary flex items-center gap-2 h-8 text-xs sm:px-4"
             >
