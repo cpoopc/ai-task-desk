@@ -1,6 +1,6 @@
 import uuid
 import hashlib
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -42,7 +42,7 @@ async def register(data: UserCreate):
         password_hash=hash_password(data.password),
         role=data.role,
         is_active=True,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
     _users_db[user.id] = user
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from mission_control.domain.models import Contact
@@ -25,7 +25,7 @@ class ContactService:
             jira_account=kwargs.get("jira_account"),
             slack_id=kwargs.get("slack_id"),
             avatar_url=kwargs.get("avatar_url"),
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         self._contacts[contact.id] = contact
         return contact

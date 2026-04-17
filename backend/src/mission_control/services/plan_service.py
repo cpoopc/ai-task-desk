@@ -1,5 +1,5 @@
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 class PlanService:
@@ -32,7 +32,7 @@ class PlanService:
             deadline = data.get("deadline")
             defer_lower = data.get("defer_lower_priority", False)
             new_task = {
-                "taskId": f"urgent-{datetime.utcnow().timestamp()}",
+                "taskId": f"urgent-{datetime.now(timezone.utc).timestamp()}",
                 "title": task_name,
                 "estimatedTime": data.get("estimated_time", "1h"),
                 "action": "Urgent task added",
@@ -71,7 +71,9 @@ class PlanService:
             if "items" not in plan:
                 plan["items"] = []
             for task in add_tasks:
-                task["taskId"] = task.get("taskId", f"scope-{datetime.utcnow().timestamp()}")
+                task["taskId"] = task.get(
+                    "taskId", f"scope-{datetime.now(timezone.utc).timestamp()}"
+                )
                 task["action"] = f"Added via scope change: {reason}"
                 plan["items"].append(task)
             plan["items"] = [t for t in plan["items"] if t.get("taskId") not in remove_task_ids]
@@ -85,7 +87,7 @@ class PlanService:
         return {"error": f"Unknown disruption type: {disruption_type}"}
 
     async def generate_daily_summary(self, sprint: str) -> dict:
-        today = datetime.utcnow().date()
+        today = datetime.now(timezone.utc).date()
         plan = self._plans.get(sprint, {})
         items = plan.get("items", [])
         completed_yesterday = [t for t in items if t.get("status") == "done"]

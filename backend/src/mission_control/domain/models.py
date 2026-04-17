@@ -1,12 +1,16 @@
 from pydantic import BaseModel, Field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from mission_control.domain.enums import Status, ReviewStatus, LinkType
 
 
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 class Decision(BaseModel):
     text: str
-    made_at: datetime = Field(default_factory=datetime.utcnow)
+    made_at: datetime = Field(default_factory=_utc_now)
     reason: Optional[str] = None
 
 
@@ -59,7 +63,7 @@ class Brief(BaseModel):
     reviewer_id: Optional[str] = None
     collaborator_ids: list[str] = Field(default_factory=list)
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utc_now)
     last_active_at: Optional[datetime] = None
     indexed_at: Optional[datetime] = None
 
@@ -73,7 +77,7 @@ class ReviewItem(BaseModel):
     files_changed: list[FileChange] = Field(default_factory=list)
     intent_checks: list[IntentCheck] = Field(default_factory=list)
     feedback: Optional[Feedback] = None
-    submitted_at: datetime = Field(default_factory=datetime.utcnow)
+    submitted_at: datetime = Field(default_factory=_utc_now)
     reviewed_at: Optional[datetime] = None
 
 
@@ -85,7 +89,7 @@ class CrossTaskLink(BaseModel):
     match_method: str = "rule"
     score: float
     matched_tags: list[str] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utc_now)
     confirmed_at: Optional[datetime] = None
 
 
@@ -95,7 +99,7 @@ class TimelineEvent(BaseModel):
     event_type: str
     title: str
     detail: Optional[str] = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
 
 
 class Notification(BaseModel):
@@ -104,7 +108,7 @@ class Notification(BaseModel):
     source_path: str
     change_description: str
     status: str = "unread"
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utc_now)
 
 
 class BriefFilters(BaseModel):
@@ -123,7 +127,7 @@ class Contact(BaseModel):
     jira_account: Optional[str] = None
     slack_id: Optional[str] = None
     avatar_url: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utc_now)
 
 
 class User(BaseModel):
@@ -133,7 +137,7 @@ class User(BaseModel):
     password_hash: str
     role: str = "member"
     is_active: bool = True
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utc_now)
 
 
 class UserNotification(BaseModel):
@@ -143,4 +147,4 @@ class UserNotification(BaseModel):
     message: str
     notification_type: str = "info"
     is_read: bool = False
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utc_now)

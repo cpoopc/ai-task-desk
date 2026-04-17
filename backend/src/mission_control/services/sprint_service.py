@@ -1,5 +1,5 @@
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class SprintService:
@@ -18,7 +18,7 @@ class SprintService:
         sprint = {
             "id": name,
             "name": name,
-            "start_date": start_date or datetime.utcnow().isoformat(),
+            "start_date": start_date or datetime.now(timezone.utc).isoformat(),
             "end_date": end_date,
             "status": "active",
         }

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 import re
 
@@ -85,7 +85,7 @@ class BriefService:
         if "constraints" in data:
             existing.constraints = data["constraints"]
 
-        existing.last_active_at = datetime.utcnow()
+        existing.last_active_at = datetime.now(timezone.utc)
 
         full_path = self.fs.root_path / path
         if full_path.exists():
@@ -96,7 +96,7 @@ class BriefService:
                 assigned_tool=existing.assigned_tool,
                 jira_key=existing.jira_key,
                 tags=existing.tags,
-                last_activity=f"Updated at {datetime.utcnow().isoformat()}",
+                last_activity=f"Updated at {datetime.now(timezone.utc).isoformat()}",
             )
             self.fs.update_meta(full_path, meta)
 
@@ -128,19 +128,74 @@ class BriefService:
         if not task:
             return None
 
+        folder_path_str = str(path.relative_to(self.fs.root_path))
+        return self._parse_task_to_brief(task, folder_path_str)
+
+    async def update_checklist(self, path: str, items: list[dict]) -> Brief | None:
+        brief = await self.repository.get_by_path(path)
+        if not brief:
+            return None
+
+        full_path = self.fs.root_path / path
+        checklist_content = ChecklistContent(
+            items=[
+                type(
+                    "Item",
+                    (),
+                    {
+                        "text": item["text"],
+                        "status": item["status"],
+                        "metadata": item.get("metadata"),
+                    },
+                )()
+                for item in items
+            ]
+        )
+
+        self.fs.update_checklist(full_path, checklist_content)
+
+        brief.checklist_total = len(items)
+        brief.checklist_done = sum(1 for item in items if item.get("status") == "done")
+        brief.last_active_at = datetime.now(timezone.utc)
+
+        await self.repository.save(brief)
+        return brief
+
+    async def search(self, query: str) -> list[Brief]:
+        return await self.repository.search(query)
+
+    async def rebuild_index(self) -> dict:
+        tasks = self.fs.walk_tasks()
+        briefs = []
+
+        for task in tasks:
+            brief = await self._task_folder_to_brief(task)
+            if brief:
+                briefs.append(brief)
+                await self.repository.save(brief)
+
+        return {
+            "total": len(briefs),
+            "sprints": len(set(b.sprint_name for b in briefs if b.sprint_name)),
+        }
+
+    async def _task_folder_to_brief(self, task: TaskFolder) -> Brief | None:
+        folder_path_str = str(task.path.relative_to(self.fs.root_path))
+        return self._parse_task_to_brief(task, folder_path_str)
+
+    def _parse_task_to_brief(self, task: TaskFolder, folder_path_str: str) -> Brief:
+        parts = folder_path_str.split("/")
+        sprint_name = parts[0] if len(parts) > 0 else None
+        folder_name = parts[1] if len(parts) > 1 else None
+
         brief_content = task.brief
         meta = task.meta
         checklist = task.checklist
 
-        folder_path_str = str(path.relative_to(self.fs.root_path))
-
-        parts = folder_path_str.split("/")
-        sprint_name = parts[0] if len(parts) > 0 else None
-        folder_name = parts[1] if len(parts) > 1 else None
         title = (
             meta.template_type
             if (meta and meta.template_type)
-            else (brief_content.title if brief_content else folder_path_str.split("/")[-1])
+            else (brief_content.title if brief_content else parts[-1])
         )
 
         status = Status.drafting
@@ -182,128 +237,7 @@ class BriefService:
             jira_key=meta.jira_key if meta else None,
             checklist_total=total,
             checklist_done=done,
-            created_at=datetime.utcnow(),
-            last_active_at=datetime.utcnow(),
-            indexed_at=datetime.utcnow(),
-        )
-
-    async def update_checklist(self, path: str, items: list[dict]) -> Brief | None:
-        brief = await self.repository.get_by_path(path)
-        if not brief:
-            return None
-
-        full_path = self.fs.root_path / path
-        checklist = ChecklistContent(
-            items=[
-                {
-                    "text": item.get("text", ""),
-                    "status": item.get("status", "todo"),
-                    "metadata": item.get("metadata"),
-                }
-                for item in items
-            ]
-        )
-
-        from dataclasses import asdict
-
-        checklist_data = asdict(checklist)
-        checklist_content = ChecklistContent(
-            items=[
-                type(
-                    "Item",
-                    (),
-                    {
-                        "text": item["text"],
-                        "status": item["status"],
-                        "metadata": item.get("metadata"),
-                    },
-                )()
-                for item in items
-            ]
-        )
-
-        self.fs.update_checklist(full_path, checklist_content)
-
-        brief.checklist_total = len(items)
-        brief.checklist_done = sum(1 for item in items if item.get("status") == "done")
-        brief.last_active_at = datetime.utcnow()
-
-        await self.repository.save(brief)
-        return brief
-
-    async def search(self, query: str) -> list[Brief]:
-        return await self.repository.search(query)
-
-    async def rebuild_index(self) -> dict:
-        tasks = self.fs.walk_tasks()
-        briefs = []
-
-        for task in tasks:
-            brief = await self._task_folder_to_brief(task)
-            if brief:
-                briefs.append(brief)
-                await self.repository.save(brief)
-
-        return {
-            "total": len(briefs),
-            "sprints": len(set(b.sprint_name for b in briefs if b.sprint_name)),
-        }
-
-    async def _task_folder_to_brief(self, task: TaskFolder) -> Brief | None:
-        folder_path_str = str(task.path.relative_to(self.fs.root_path))
-
-        parts = folder_path_str.split("/")
-        sprint_name = parts[0] if len(parts) > 0 else None
-        folder_name = parts[1] if len(parts) > 1 else None
-
-        title = (
-            task.meta.template_type
-            if (task.meta and task.meta.template_type)
-            else (task.brief.title if task.brief else parts[-1])
-        )
-
-        status = Status.drafting
-        if task.meta and task.meta.status:
-            try:
-                status = Status(task.meta.status)
-            except ValueError:
-                status = Status.drafting
-
-        parent_parts = folder_path_str.split("/")
-        parent_task_path = None
-        if len(parent_parts) > 3:
-            parent_task_path = "/".join(parent_parts[:-1])
-
-        decisions = []
-        if task.decisions:
-            decisions = [Decision(text=d) for d in task.decisions.decisions]
-
-        total = len(task.checklist.items) if task.checklist else 0
-        done = sum(
-            1 for item in (task.checklist.items if task.checklist else []) if item.status == "done"
-        )
-
-        return Brief(
-            id=str(uuid.uuid4()),
-            folder_path=folder_path_str,
-            title=title,
-            status=status,
-            current_step=task.meta.current_step if task.meta else 0,
-            total_steps=task.meta.total_steps if task.meta else 0,
-            assigned_tool=task.meta.assigned_tool if task.meta else None,
-            sprint_name=sprint_name,
-            folder_name=folder_name,
-            parent_task_path=parent_task_path,
-            goal=task.brief.goal if task.brief else "",
-            technical_details=task.brief.technical_details if task.brief else "",
-            constraints=task.brief.constraints if task.brief else [],
-            decisions=decisions,
-            tags=task.meta.tags if task.meta and task.meta.tags else [],
-            extracted_tags=[],
-            jira_key=task.meta.jira_key if task.meta else None,
-            checklist_total=total,
-            checklist_done=done,
-            created_at=datetime.utcnow(),
-            last_active_at=datetime.utcnow(),
-            indexed_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
+            last_active_at=datetime.now(timezone.utc),
+            indexed_at=datetime.now(timezone.utc),
         )

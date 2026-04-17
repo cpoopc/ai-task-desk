@@ -1,7 +1,7 @@
 from __future__ import annotations
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ class NotificationService:
             "message": message,
             "notification_type": notification_type,
             "is_read": False,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
         self._notifications[notification_id] = notification
         return notification

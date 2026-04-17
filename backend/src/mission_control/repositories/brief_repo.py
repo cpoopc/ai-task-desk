@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlmodel import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -130,7 +130,7 @@ class BriefRepoAsyncSQLite(BriefRepository):
             jira_key=model.jira_key,
             checklist_total=model.checklist_total,
             checklist_done=model.checklist_done,
-            created_at=model.indexed_at or datetime.utcnow(),
+            created_at=model.indexed_at or datetime.now(timezone.utc),
             last_active_at=model.last_active_at,
             indexed_at=model.indexed_at,
         )
@@ -153,7 +153,7 @@ class BriefRepoAsyncSQLite(BriefRepository):
             checklist_total=brief.checklist_total,
             checklist_done=brief.checklist_done,
             last_active_at=brief.last_active_at,
-            indexed_at=brief.indexed_at or datetime.utcnow(),
+            indexed_at=brief.indexed_at or datetime.now(timezone.utc),
         )
 
     def _update_model(self, model: BriefIndex, brief: Brief) -> None:
@@ -171,4 +171,4 @@ class BriefRepoAsyncSQLite(BriefRepository):
         model.checklist_total = brief.checklist_total
         model.checklist_done = brief.checklist_done
         model.last_active_at = brief.last_active_at
-        model.indexed_at = datetime.utcnow()
+        model.indexed_at = datetime.now(timezone.utc)

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from datetime import datetime
+from datetime import datetime, timezone
 from mission_control.services.sprint_service import SprintService
 from mission_control.api.deps import get_sprint_service
 from mission_control.api.schemas import (
@@ -80,7 +80,7 @@ async def get_sprint_progress(
 
     start_date = datetime.fromisoformat(start_date_str.replace("Z", "+00:00"))
     end_date = datetime.fromisoformat(end_date_str.replace("Z", "+00:00"))
-    today = datetime.utcnow()
+    today = datetime.now(timezone.utc)
 
     days_elapsed = max(0, (today - start_date.replace(tzinfo=None)).days)
     days_total = max(1, (end_date.replace(tzinfo=None) - start_date.replace(tzinfo=None)).days)
@@ -127,7 +127,7 @@ async def get_sprint_summary(
 
     if end_date_str:
         end_date = datetime.fromisoformat(end_date_str.replace("Z", "+00:00"))
-        today = datetime.utcnow()
+        today = datetime.now(timezone.utc)
         days_left = (end_date.replace(tzinfo=None) - today.replace(tzinfo=None)).days
         if days_left < 2 and days_left >= 0:
             recommendations.append(f"Sprint ends in {days_left} day(s) - wrap up remaining tasks!")

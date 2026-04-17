@@ -1,5 +1,5 @@
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlmodel import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -44,7 +44,7 @@ class LinkRepoAsyncSQLite(LinkRepository):
         result = await self.session.get(CrossTaskLinkDB, id)
         if result:
             result.link_type = LinkType.confirmed.value
-            result.confirmed_at = datetime.utcnow()
+            result.confirmed_at = datetime.now(timezone.utc)
             await self.session.commit()
             return self._to_domain(result)
         raise ValueError(f"Link {id} not found")

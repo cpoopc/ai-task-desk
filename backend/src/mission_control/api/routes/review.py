@@ -1,7 +1,7 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from mission_control.domain.models import ReviewItem
 from mission_control.domain.enums import ReviewStatus
@@ -49,7 +49,7 @@ async def create_review(
         diff_summary=data.diff_summary,
         files_changed=[FileChange(**f) for f in data.files_changed],
         intent_checks=[IntentCheck(**i) for i in data.intent_checks],
-        submitted_at=datetime.utcnow(),
+        submitted_at=datetime.now(timezone.utc),
     )
 
     created = await service.create(review)

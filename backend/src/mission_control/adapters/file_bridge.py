@@ -1,6 +1,6 @@
 import json
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,7 +36,7 @@ class FileBridge:
         return {
             "briefs": synced_briefs,
             "reviews": synced_reviews,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
     async def sync_to_files(self) -> dict:
@@ -52,7 +52,7 @@ class FileBridge:
 
         return {
             "briefs": synced,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
     async def _sync_task_to_db(self, task) -> BriefIndex | None:

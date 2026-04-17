@@ -1,5 +1,5 @@
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlmodel import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -51,7 +51,7 @@ class ReviewRepoAsyncSQLite(ReviewRepository):
         result = await self.session.get(ReviewItemDB, id)
         if result:
             result.feedback = feedback
-            result.reviewed_at = datetime.utcnow()
+            result.reviewed_at = datetime.now(timezone.utc)
             await self.session.commit()
             return self._to_domain(result)
         raise ValueError(f"Review {id} not found")
