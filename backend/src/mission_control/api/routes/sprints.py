@@ -40,7 +40,7 @@ async def update_sprint(
 ):
     sprint = await service.update(id, data.model_dump(exclude_unset=True))
     if not sprint:
-        return {"error": "Sprint not found"}
+        raise HTTPException(status_code=404, detail="Sprint not found")
     return sprint
 
 

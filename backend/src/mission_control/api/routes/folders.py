@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from mission_control.services.folder_service import FolderService
 from mission_control.api.deps import get_folder_service
 from mission_control.api.schemas import FolderCreate, FolderUpdate, FolderResponse
@@ -43,7 +43,7 @@ async def delete_folder(
 ):
     success = service.delete_folder(path)
     if not success:
-        return {"status": "not_found"}
+        raise HTTPException(status_code=404, detail="Folder not found")
     return {"status": "deleted"}
 
 
@@ -57,4 +57,4 @@ async def move_folder(
         result = service.move_folder(path, target)
         return result
     except ValueError as e:
-        return {"error": str(e)}
+        raise HTTPException(status_code=400, detail=str(e))
