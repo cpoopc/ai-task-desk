@@ -67,6 +67,40 @@ export interface Sprint {
   status: string;
 }
 
+export interface TaskStats {
+  total: number;
+  done: number;
+  in_progress: number;
+  blocked: number;
+  review: number;
+}
+
+export interface SprintProgress {
+  sprint_id: string;
+  sprint_name: string;
+  days_elapsed: number;
+  days_total: number;
+  days_remaining: number;
+  percent_complete: number;
+  task_stats: TaskStats;
+  velocity: number;
+  at_risk: boolean;
+}
+
+export interface SprintSummary {
+  sprint_name: string;
+  start_date: string | null;
+  end_date: string | null;
+  status: string;
+  total_tasks: number;
+  completed_tasks: number;
+  completion_rate: number;
+  tasks_by_status: Record<string, number>;
+  blockers: string[];
+  upcoming_deadlines: string[];
+  recommendations: string[];
+}
+
 export interface Folder {
   name: string;
   path: string;
@@ -194,6 +228,10 @@ export const sprintsAPI = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+
+  getProgress: (id: string) => fetchJSON<SprintProgress>(`${API_BASE}/sprints/${id}/progress`),
+
+  getSummary: (id: string) => fetchJSON<SprintSummary>(`${API_BASE}/sprints/${id}/summary`),
 };
 
 // Reviews API

@@ -18,7 +18,10 @@ import {
   Trash2,
   MoreHorizontal,
   X as XIcon,
-  RotateCcw
+  RotateCcw,
+  AlertTriangle,
+  CheckCircle,
+  BarChart3
 } from 'lucide-react';
 import { cn } from './lib/utils';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
@@ -29,6 +32,7 @@ import TaskGraph from './components/TaskGraph';
 import Kanban from './components/Kanban';
 import LivingPlan from './components/LivingPlan';
 import FolderModal from './components/FolderModal';
+import SprintSummaryModal from './components/SprintSummaryModal';
 import { TaskBrief } from './types';
 import { searchAPI } from './services/api';
 
@@ -47,6 +51,7 @@ function AppContent() {
   const { tasks, folders, sprints, activeSprintId, setActiveSprintId, activeFolderId, setActiveFolderId, activeTags, toggleTag, useMockData, setUseMockData, error, createFolder, updateFolder, deleteFolder, moveFolder, createSprint } = useTasks();
 
   const [folderModalOpen, setFolderModalOpen] = useState(false);
+  const [sprintSummaryOpen, setSprintSummaryOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({ visible: false, x: 0, y: 0, folderId: null });
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
@@ -225,17 +230,11 @@ function AppContent() {
             <div className="flex items-center justify-between pr-2">
               <h2 className="zone-title">Sprint</h2>
               <button
-                onClick={() => {
-                  const name = prompt('Sprint name:');
-                  if (name) {
-                    const startDate = prompt('Start date (YYYY-MM-DD, leave empty for today):');
-                    const endDate = prompt('End date (YYYY-MM-DD):');
-                    createSprint(name, startDate || undefined, endDate || undefined);
-                  }
-                }}
-                className="text-[11px] text-primary hover:text-primary/80 font-medium"
+                onClick={() => setSprintSummaryOpen(true)}
+                className="text-[11px] text-primary hover:text-primary/80 font-medium flex items-center gap-1"
+                title="Sprint Summary"
               >
-                + New
+                <BarChart3 size={12} />
               </button>
             </div>
             <div className="bg-[#F3F4F6] p-3 rounded-md space-y-2">
@@ -263,14 +262,37 @@ function AppContent() {
                         const elapsedDays = Math.ceil((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
                         const dayProgress = Math.min(100, Math.max(0, (elapsedDays / totalDays) * 100));
                         const currentDay = Math.min(totalDays, Math.max(1, elapsedDays + 1));
+                        const daysRemaining = Math.max(0, totalDays - elapsedDays);
+                        const isAtRisk = dayProgress < 50 && elapsedDays > totalDays * 0.5;
                         return (
                           <>
                             <div className="flex justify-between items-center text-[12px]">
                               <span className="text-slate-500 font-medium">Day {currentDay}/{totalDays}</span>
-                              <span className="text-slate-400 text-[10px]">{Math.round(dayProgress)}%</span>
+                              <div className="flex items-center gap-1">
+                                {daysRemaining < 2 && daysRemaining > 0 && (
+                                  <span className="flex items-center gap-0.5 text-[10px] text-red-500 font-semibold">
+                                    <AlertTriangle size={10} />
+                                  </span>
+                                )}
+                                <span className={cn(
+                                  "text-[10px] font-medium",
+                                  isAtRisk ? "text-red-500" : "text-slate-400"
+                                )}>
+                                  {isAtRisk ? "At Risk" : dayProgress >= 80 ? "On Track" : "In Progress"}
+                                </span>
+                              </div>
                             </div>
                             <div className="h-1 w-full bg-[#D1D5DB] rounded-full overflow-hidden">
-                              <div className="h-full bg-primary" style={{ width: `${dayProgress}%` }} />
+                              <div
+                                className={cn("h-full transition-all", isAtRisk ? "bg-red-400" : "bg-primary")}
+                                style={{ width: `${dayProgress}%` }}
+                              />
+                            </div>
+                            <div className="flex justify-between items-center text-[11px]">
+                              <span className="text-slate-500">
+                                {daysRemaining} day{daysRemaining !== 1 ? "s" : ""} left
+                              </span>
+                              <span className="text-slate-400">{Math.round(dayProgress)}%</span>
                             </div>
                           </>
                         );
@@ -425,6 +447,13 @@ function AppContent() {
             isOpen={folderModalOpen}
             onClose={() => setFolderModalOpen(false)}
             onCreate={handleCreateFolder}
+          />
+
+          <SprintSummaryModal
+            isOpen={sprintSummaryOpen}
+            onClose={() => setSprintSummaryOpen(false)}
+            sprintId={activeSprintId}
+            sprintName={activeSprint?.name || ''}
           />
 
           {/* Tags */}

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from mission_control.services.plan_service import PlanService
 from mission_control.api.deps import get_plan_service
-from mission_control.api.schemas import PlanUpdate, DailySummary
+from mission_control.api.schemas import PlanUpdate, DailySummary, DisruptionRequest
 
 router = APIRouter(prefix="/api/plan", tags=["plan"])
 
@@ -43,3 +43,13 @@ async def generate_daily_summary(
 ):
     summary = await service.generate_daily_summary(sprint)
     return DailySummary(**summary)
+
+
+@router.post("/{sprint}/disruption")
+async def handle_disruption(
+    sprint: str,
+    request: DisruptionRequest,
+    service: PlanService = Depends(get_plan_service),
+):
+    result = await service.handle_disruption(sprint, request.disruption_type, request.data)
+    return result

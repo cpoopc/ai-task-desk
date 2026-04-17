@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTasks } from '../TaskContext';
 import { aiService } from '../services/aiService';
+import DisruptionModal, { DisruptionType } from './DisruptionModal';
 import { 
   CheckCircle2, 
   Clock, 
@@ -17,7 +18,10 @@ import {
   ChevronDown,
   Search,
   Filter,
-  GripVertical
+  GripVertical,
+  AlertTriangle,
+  CalendarDays,
+  Target
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { 
@@ -34,6 +38,8 @@ export default function LivingPlan() {
   const [editingTime, setEditingTime] = useState<{ dayIdx: number, taskIdx: number } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [disruptionOpen, setDisruptionOpen] = useState(false);
+  const [disruptionMenuOpen, setDisruptionMenuOpen] = useState(false);
 
   const activeSprint = sprints.find(s => s.id === activeSprintId);
   
@@ -49,6 +55,21 @@ export default function LivingPlan() {
     const newPlan = await aiService.generateDailyPlan(tasks, activeSprint);
     setPlan(newPlan);
     setLoading(false);
+  };
+
+  const handleDisruption = async (type: DisruptionType, data: any) => {
+    if (!activeSprint) return;
+    try {
+      await fetch(`/api/plan/${activeSprint.id}/disruption`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ disruption_type: type, data }),
+      });
+      await refreshPlan();
+    } catch (err) {
+      console.error('Failed to handle disruption:', err);
+    }
+    setDisruptionMenuOpen(false);
   };
 
   useEffect(() => {
@@ -204,10 +225,56 @@ export default function LivingPlan() {
                    <RotateCcw size={14} className={cn(loading && "animate-spin")} />
                    AI Rebalance
                  </button>
-                 <button className="btn btn-primary flex items-center gap-2 h-8 text-[11px]">
-                   <Zap size={14} />
-                   Disruption Handle
-                 </button>
+<div className="relative">
+                  <button 
+                    onClick={() => setDisruptionMenuOpen(!disruptionMenuOpen)}
+                    className="btn btn-primary flex items-center gap-2 h-8 text-[11px]"
+                  >
+                    <Zap size={14} />
+                    Disruption
+                    <ChevronDown size={12} className={cn(disruptionMenuOpen && "rotate-180")} />
+                  </button>
+                  {disruptionMenuOpen && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setDisruptionMenuOpen(false)} />
+                      <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-border rounded-lg shadow-lg z-20 overflow-hidden">
+                        <div className="p-2">
+                          <p className="text-[9px] font-bold text-text-muted uppercase px-2 py-1 mb-1">Select Disruption Type</p>
+                          <button
+                            onClick={() => { setDisruptionOpen(true); setDisruptionMenuOpen(false); }}
+                            className="w-full flex items-center gap-3 px-2 py-2 rounded hover:bg-slate-50 transition-colors text-left"
+                          >
+                            <AlertTriangle size={14} className="text-error" />
+                            <div>
+                              <p className="text-[11px] font-semibold text-text-main">Add Urgent Task</p>
+                              <p className="text-[9px] text-text-muted">Insert high-priority task</p>
+                            </div>
+                          </button>
+                          <button
+                            onClick={() => { setDisruptionOpen(true); setDisruptionMenuOpen(false); }}
+                            className="w-full flex items-center gap-3 px-2 py-2 rounded hover:bg-slate-50 transition-colors text-left"
+                          >
+                            <CalendarDays size={14} className="text-warning" />
+                            <div>
+                              <p className="text-[11px] font-semibold text-text-main">Mark Capacity Reduction</p>
+                              <p className="text-[9px] text-text-muted">Indicate reduced availability</p>
+                            </div>
+                          </button>
+                          <button
+                            onClick={() => { setDisruptionOpen(true); setDisruptionMenuOpen(false); }}
+                            className="w-full flex items-center gap-3 px-2 py-2 rounded hover:bg-slate-50 transition-colors text-left"
+                          >
+                            <Target size={14} className="text-primary" />
+                            <div>
+                              <p className="text-[11px] font-semibold text-text-main">Scope Change</p>
+                              <p className="text-[9px] text-text-muted">Add or remove tasks</p>
+                            </div>
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </header>
 
@@ -298,6 +365,12 @@ export default function LivingPlan() {
           </div>
         </div>
       </div>
+
+      <DisruptionModal
+        isOpen={disruptionOpen}
+        onClose={() => setDisruptionOpen(false)}
+        onSubmit={handleDisruption}
+      />
     </DragDropContext>
   );
 }

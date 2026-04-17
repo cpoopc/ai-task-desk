@@ -119,6 +119,40 @@ class SprintResponse(BaseModel):
     status: str = "active"
 
 
+class TaskStats(BaseModel):
+    total: int = 0
+    done: int = 0
+    in_progress: int = 0
+    blocked: int = 0
+    review: int = 0
+
+
+class SprintProgress(BaseModel):
+    sprint_id: str
+    sprint_name: str
+    days_elapsed: int = 0
+    days_total: int = 0
+    days_remaining: int = 0
+    percent_complete: float = 0.0
+    task_stats: TaskStats = TaskStats()
+    velocity: float = 0.0
+    at_risk: bool = False
+
+
+class SprintSummary(BaseModel):
+    sprint_name: str
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    status: str = "active"
+    total_tasks: int = 0
+    completed_tasks: int = 0
+    completion_rate: float = 0.0
+    tasks_by_status: dict[str, int] = {}
+    blockers: list[str] = []
+    upcoming_deadlines: list[str] = []
+    recommendations: list[str] = []
+
+
 class SyncResult(BaseModel):
     synced: bool
     sprint_id: str
@@ -131,10 +165,39 @@ class PlanUpdate(BaseModel):
 class DailySummary(BaseModel):
     date: str
     sprint: str
+    completed_yesterday: int = 0
+    planned_today: int = 0
     completed: int = 0
     in_progress: int = 0
     blocked: int = 0
+    blockers: list[dict] = []
     upcoming: list[str] = []
+    recommendations: list[str] = []
+
+
+class UrgentTaskData(BaseModel):
+    task_name: str
+    priority: str = "high"
+    deadline: Optional[str] = None
+    estimated_time: str = "1h"
+    defer_lower_priority: bool = False
+
+
+class ReducedCapacityData(BaseModel):
+    start_date: str
+    end_date: str
+    percentage: int = 50
+
+
+class ScopeChangeData(BaseModel):
+    add_tasks: list[dict] = []
+    remove_task_ids: list[str] = []
+    reason: str = ""
+
+
+class DisruptionRequest(BaseModel):
+    disruption_type: str
+    data: dict = {}
 
 
 class ReviewCreate(BaseModel):
