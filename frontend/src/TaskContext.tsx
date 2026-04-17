@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { TaskBrief, Sprint, Folder } from './types';
+import { TaskBrief, TaskStatus, Sprint, Folder } from './types';
 import { briefsAPI, sprintsAPI, foldersAPI, focusAPI, FocusItem } from './services/api';
 import { INITIAL_TASKS, INITIAL_SPRINTS, INITIAL_FOLDERS } from './constants';
 
@@ -95,7 +95,40 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         briefsRes.map((b) => briefsAPI.get(b.folder_path).catch(() => null))
       );
 
-      const validTasks = tasksFromApi.filter(Boolean) as TaskBrief[];
+      const validTasks = tasksFromApi.filter(Boolean).map((t) => ({
+        id: t!.id,
+        path: t!.folder_path,
+        goal: t!.goal,
+        technicalDetails: t!.technical_details,
+        errorHandling: '',
+        featureFlag: undefined,
+        metrics: [],
+        filesAffected: [],
+        constraints: t!.constraints || [],
+        references: [],
+        checklist: [],
+        decisions: (t!.decisions || []).map((d) => ({
+          id: crypto.randomUUID(),
+          question: '',
+          answer: d.text,
+          rationale: d.reason || '',
+          source: '',
+          timestamp: d.made_at,
+        })),
+        meta: {
+          status: t!.status as TaskStatus,
+          currentStep: t!.current_step,
+          totalSteps: t!.total_steps,
+          assignedAI: t!.assigned_tool || '',
+          tags: t!.tags || [],
+          owner: { name: '', avatar: '' },
+          stakeholders: [],
+          externalLinks: [],
+          relations: [],
+          resources: [],
+        },
+        subtasks: [],
+      })) as TaskBrief[];
       setTasks(validTasks);
       setSprints(sprintsRes.map((s: { id: string; name: string; start_date?: string; end_date?: string; status: string }) => ({
         id: s.id,
