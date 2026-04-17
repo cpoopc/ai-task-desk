@@ -62,6 +62,7 @@ export interface Sprint {
   id: string;
   name: string;
   start_date: string | null;
+  end_date: string | null;
   status: string;
 }
 
@@ -136,6 +137,12 @@ export const briefsAPI = {
   stats: () => fetchJSON<DashboardStats>(`${API_BASE}/briefs/stats`),
 
   rebuildIndex: () => fetchJSON<{ total: number; sprints: number }>(`${API_BASE}/briefs/rebuild-index`, { method: 'POST' }),
+
+  exportBrief: (path: string) =>
+    fetchJSON<{ brief_path: string; content: { '.cursorrules': string; 'CLAUDE.md': string; 'AGENTS.md': string } }>(
+      `${API_BASE}/briefs/${path}/export-content`,
+      { method: 'POST' }
+    ),
 };
 
 // Folders API
@@ -168,13 +175,13 @@ export const foldersAPI = {
 export const sprintsAPI = {
   list: () => fetchJSON<Sprint[]>(`${API_BASE}/sprints`),
 
-  create: (name: string, startDate?: string) =>
+  create: (name: string, startDate?: string, endDate?: string) =>
     fetchJSON<Sprint>(`${API_BASE}/sprints`, {
       method: 'POST',
-      body: JSON.stringify({ name, start_date: startDate }),
+      body: JSON.stringify({ name, start_date: startDate, end_date: endDate }),
     }),
 
-  update: (id: string, data: { name?: string; status?: string }) =>
+  update: (id: string, data: { name?: string; status?: string; start_date?: string; end_date?: string }) =>
     fetchJSON<Sprint>(`${API_BASE}/sprints/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -216,6 +223,19 @@ export const searchAPI = {
 // Health check
 export const healthAPI = {
   check: () => fetchJSON<{ status: string }>(`${API_BASE}/health`),
+};
+
+// Focus API
+export interface FocusItem {
+  id: string;
+  title: string;
+  folder_path: string;
+  status: string;
+  priority: number;
+}
+
+export const focusAPI = {
+  getFocusItems: () => fetchJSON<FocusItem[]>(`${API_BASE}/briefs/focus`),
 };
 
 // Helper to convert backend Brief to frontend TaskBrief format

@@ -1,40 +1,198 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { TaskProvider, useTasks } from './TaskContext';
-import { 
-  LayoutDashboard, 
-  ClipboardList, 
-  GitGraph, 
-  Trello, 
-  Archive, 
-  Search, 
-  Plus, 
+import {
+  LayoutDashboard,
+  ClipboardList,
+  GitGraph,
+  Trello,
+  Archive,
+  Search,
+  Plus,
   ChevronRight,
   Bell,
   Settings,
   Circle,
-  Clock
+  Clock,
+  GripVertical,
+  Pencil,
+  Trash2,
+  MoreHorizontal,
+  X as XIcon,
+  RotateCcw
 } from 'lucide-react';
 import { cn } from './lib/utils';
+import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import Dashboard from './components/Dashboard';
 import TaskDetail from './components/TaskDetail';
 import ReviewQueue from './components/ReviewQueue';
 import TaskGraph from './components/TaskGraph';
 import Kanban from './components/Kanban';
 import LivingPlan from './components/LivingPlan';
+import FolderModal from './components/FolderModal';
 import { TaskBrief } from './types';
+import { searchAPI } from './services/api';
 
 type ViewMode = 'dashboard' | 'review' | 'graph' | 'kanban' | 'archive' | 'detail' | 'plan';
+
+interface ContextMenuState {
+  visible: boolean;
+  x: number;
+  y: number;
+  folderId: string | null;
+}
 
 function AppContent() {
   const [view, setView] = useState<ViewMode>('dashboard');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const { tasks, folders, sprints, activeSprintId, setActiveSprintId, activeFolderId, setActiveFolderId, activeTags, toggleTag, useMockData, setUseMockData, error } = useTasks();
+  const { tasks, folders, sprints, activeSprintId, setActiveSprintId, activeFolderId, setActiveFolderId, activeTags, toggleTag, useMockData, setUseMockData, error, createFolder, updateFolder, deleteFolder, moveFolder, createSprint } = useTasks();
+
+  const [folderModalOpen, setFolderModalOpen] = useState(false);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState>({ visible: false, x: 0, y: 0, folderId: null });
+  const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const editInputRef = useRef<HTMLInputElement>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Array<{ id: string; title: string; folder_path: string; status: string; score: number }>>([]);
+  const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const activeSprint = sprints.find(s => s.id === activeSprintId);
   
   const handleOpenTask = (taskId: string) => {
     setSelectedTaskId(taskId);
     setView('detail');
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, folderId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ visible: true, x: e.clientX, y: e.clientY, folderId });
+  };
+
+  const closeContextMenu = () => {
+    setContextMenu({ visible: false, x: 0, y: 0, folderId: null });
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        closeContextMenu();
+      }
+    };
+    if (contextMenu.visible) {
+      document.addEventListener('click', handleClickOutside);
+    }
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [contextMenu.visible]);
+
+  const handleRenameFolder = (folderId: string) => {
+    const folder = folders.find(f => f.id === folderId);
+    if (folder) {
+      setEditingFolderId(folderId);
+      setEditingName(folder.name);
+      closeContextMenu();
+    }
+  };
+
+  const handleDeleteFolder = async (folderId: string) => {
+    if (window.confirm('Are you sure you want to delete this folder?')) {
+      try {
+        await deleteFolder(folderId);
+        if (activeFolderId === folderId) {
+          setActiveFolderId('all');
+        }
+      } catch (err) {
+        console.error('Failed to delete folder:', err);
+      }
+    }
+    closeContextMenu();
+  };
+
+  const handleCreateFolder = async (name: string) => {
+    try {
+      await createFolder(name);
+    } catch (err) {
+      console.error('Failed to create folder:', err);
+    }
+  };
+
+  const handleRenameSubmit = async () => {
+    if (editingFolderId && editingName.trim()) {
+      try {
+        await updateFolder(editingFolderId, editingName.trim());
+      } catch (err) {
+        console.error('Failed to rename folder:', err);
+      }
+    }
+    setEditingFolderId(null);
+    setEditingName('');
+  };
+
+  const handleRenameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleRenameSubmit();
+    } else if (e.key === 'Escape') {
+      setEditingFolderId(null);
+      setEditingName('');
+    }
+  };
+
+  useEffect(() => {
+    if (editingFolderId && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [editingFolderId]);
+
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    if (searchQuery.trim().length > 0) {
+      setSearchDropdownOpen(true);
+      searchTimeoutRef.current = setTimeout(async () => {
+        try {
+          const results = await searchAPI.search(searchQuery);
+          setSearchResults(results);
+        } catch (err) {
+          console.error('Search failed:', err);
+          setSearchResults([]);
+        }
+      }, 300);
+    } else {
+      setSearchResults([]);
+      setSearchDropdownOpen(false);
+    }
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchInputRef.current && !searchInputRef.current.closest('.search-container')?.contains(e.target as Node)) {
+        setSearchDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleDragEnd = async (result: DropResult) => {
+    const { destination, source, draggableId } = result;
+    if (!destination) return;
+    if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+    
+    try {
+      await moveFolder(draggableId, folders[destination.index]?.parentId || '');
+    } catch (err) {
+      console.error('Failed to move folder:', err);
+    }
   };
 
   const navItems = [
@@ -64,15 +222,75 @@ function AppContent() {
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-0 space-y-0">
           {/* Sprint Zone */}
           <div className="sidebar-zone space-y-3">
-            <h2 className="zone-title">Current Sprint</h2>
+            <div className="flex items-center justify-between pr-2">
+              <h2 className="zone-title">Sprint</h2>
+              <button
+                onClick={() => {
+                  const name = prompt('Sprint name:');
+                  if (name) {
+                    const startDate = prompt('Start date (YYYY-MM-DD, leave empty for today):');
+                    const endDate = prompt('End date (YYYY-MM-DD):');
+                    createSprint(name, startDate || undefined, endDate || undefined);
+                  }
+                }}
+                className="text-[11px] text-primary hover:text-primary/80 font-medium"
+              >
+                + New
+              </button>
+            </div>
             <div className="bg-[#F3F4F6] p-3 rounded-md space-y-2">
-              <div className="flex justify-between items-center text-[12px]">
-                <strong className="text-slate-900 font-bold">{activeSprint?.name}</strong>
-                <span className="text-slate-500 font-medium">Day 4/10</span>
-              </div>
-              <div className="h-1 w-full bg-[#D1D5DB] rounded-full overflow-hidden">
-                <div className="h-full bg-primary" style={{ width: '65%' }} />
-              </div>
+              <select
+                value={activeSprintId}
+                onChange={(e) => setActiveSprintId(e.target.value)}
+                className="w-full text-[12px] font-bold text-slate-900 bg-transparent border-none outline-none cursor-pointer"
+              >
+                {sprints.map(sprint => (
+                  <option key={sprint.id} value={sprint.id}>{sprint.name}</option>
+                ))}
+              </select>
+              {activeSprint && (
+                <>
+                  {activeSprint.startDate && activeSprint.endDate ? (
+                    <>
+                      {(() => {
+                        const start = new Date(activeSprint.startDate);
+                        const end = new Date(activeSprint.endDate);
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        start.setHours(0, 0, 0, 0);
+                        end.setHours(0, 0, 0, 0);
+                        const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+                        const elapsedDays = Math.ceil((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+                        const dayProgress = Math.min(100, Math.max(0, (elapsedDays / totalDays) * 100));
+                        const currentDay = Math.min(totalDays, Math.max(1, elapsedDays + 1));
+                        return (
+                          <>
+                            <div className="flex justify-between items-center text-[12px]">
+                              <span className="text-slate-500 font-medium">Day {currentDay}/{totalDays}</span>
+                              <span className="text-slate-400 text-[10px]">{Math.round(dayProgress)}%</span>
+                            </div>
+                            <div className="h-1 w-full bg-[#D1D5DB] rounded-full overflow-hidden">
+                              <div className="h-full bg-primary" style={{ width: `${dayProgress}%` }} />
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </>
+                  ) : (
+                    <div className="text-[11px] text-slate-400 italic">No dates set</div>
+                  )}
+                  {activeSprint.tasks.length > 0 && (
+                    <div className="flex justify-between items-center text-[11px]">
+                      <span className="text-slate-500">
+                        {activeSprint.tasks.length} tasks
+                      </span>
+                      <span className="text-slate-400">
+                        {tasks.filter(t => activeSprint.tasks.includes(t.id) && t.meta.status === 'Done').length} done
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
 
@@ -101,25 +319,113 @@ function AppContent() {
 
           {/* Folders */}
           <div className="sidebar-zone space-y-1">
-            <h2 className="zone-title">Folders</h2>
-            {folders.map(folder => (
+            <div className="flex items-center justify-between pr-2">
+              <h2 className="zone-title">Folders</h2>
               <button
-                key={folder.id}
-                onClick={() => setActiveFolderId(folder.id)}
-                className={cn(
-                  "flex items-center gap-2 w-full py-1 text-[13px] transition-colors",
-                  activeFolderId === folder.id ? "text-text-main font-semibold" : "text-text-muted hover:text-primary"
-                )}
+                onClick={() => setFolderModalOpen(true)}
+                className="p-1 hover:bg-slate-100 rounded transition-colors text-text-muted hover:text-primary"
+                title="Create new folder"
               >
-                <div 
-                  className="w-2 h-2 rounded-full shrink-0" 
-                  style={{ backgroundColor: folder.color || '#9CA3AF' }} 
-                />
-                <span className="truncate">{folder.name}</span>
-                <span className="ml-auto text-[11px] text-text-muted opacity-60">{folder.tasks.length}</span>
+                <Plus size={14} />
               </button>
-            ))}
+            </div>
+            <DragDropContext onDragEnd={handleDragEnd}>
+              <Droppable droppableId="folders">
+                {(provided) => (
+                  <div ref={provided.innerRef} {...provided.droppableProps}>
+                    {folders.map((folder, index) => (
+                      <Draggable draggableId={folder.id} index={index}>
+                        {(provided, snapshot) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            className={cn(
+                              "group flex items-center gap-1 w-full py-1 text-[13px] transition-colors rounded",
+                              snapshot.isDragging ? "bg-slate-100 shadow-sm" : "",
+                              activeFolderId === folder.id ? "text-text-main font-semibold" : "text-text-muted hover:text-primary"
+                            )}
+                            onContextMenu={(e) => handleContextMenu(e, folder.id)}
+                            onDoubleClick={() => handleRenameFolder(folder.id)}
+                          >
+                            <div
+                              {...provided.dragHandleProps}
+                              className="p-1 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-slate-600"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <GripVertical size={12} />
+                            </div>
+                            <button
+                              onClick={() => setActiveFolderId(folder.id)}
+                              className="flex items-center gap-2 flex-1 min-w-0"
+                            >
+                              <div 
+                                className="w-2 h-2 rounded-full shrink-0" 
+                                style={{ backgroundColor: folder.color || '#9CA3AF' }} 
+                              />
+                              {editingFolderId === folder.id ? (
+                                <input
+                                  ref={editInputRef}
+                                  type="text"
+                                  value={editingName}
+                                  onChange={(e) => setEditingName(e.target.value)}
+                                  onBlur={handleRenameSubmit}
+                                  onKeyDown={handleRenameKeyDown}
+                                  className="flex-1 px-1 py-0 text-[13px] border border-primary rounded-sm bg-white focus:outline-none"
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              ) : (
+                                <span className="truncate">{folder.name}</span>
+                              )}
+                              <span className="text-[11px] text-text-muted opacity-60 shrink-0">{folder.tasks.length}</span>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleContextMenu(e, folder.id);
+                              }}
+                              className="p-1 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-slate-600 rounded"
+                            >
+                              <MoreHorizontal size={12} />
+                            </button>
+                          </div>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            </DragDropContext>
           </div>
+
+          {contextMenu.visible && (
+            <div
+              ref={contextMenuRef}
+              className="fixed z-50 bg-white rounded-md shadow-lg border border-slate-200 py-1 min-w-[120px]"
+              style={{ left: contextMenu.x, top: contextMenu.y }}
+            >
+              <button
+                onClick={() => contextMenu.folderId && handleRenameFolder(contextMenu.folderId)}
+                className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                <Pencil size={12} />
+                Rename
+              </button>
+              <button
+                onClick={() => contextMenu.folderId && handleDeleteFolder(contextMenu.folderId)}
+                className="flex items-center gap-2 w-full px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 transition-colors"
+              >
+                <Trash2 size={12} />
+                Delete
+              </button>
+            </div>
+          )}
+
+          <FolderModal
+            isOpen={folderModalOpen}
+            onClose={() => setFolderModalOpen(false)}
+            onCreate={handleCreateFolder}
+          />
 
           {/* Tags */}
           <div className="sidebar-zone border-0 space-y-3">
@@ -176,13 +482,61 @@ function AppContent() {
               </span>
             </div>
             
-            <div className="relative max-w-sm w-full ml-auto mr-4">
+            <div className="relative max-w-sm w-full ml-auto mr-4 search-container">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" size={14} />
-              <input 
-                type="text" 
-                placeholder="Search..."
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search tasks..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => searchQuery.trim() && setSearchDropdownOpen(true)}
                 className="w-full bg-[#fafafa] border border-border rounded-[4px] pl-9 pr-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary/20"
               />
+              {searchQuery && (
+                <button
+                  onClick={() => { setSearchQuery(''); setSearchResults([]); setSearchDropdownOpen(false); }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-main"
+                >
+                  <XIcon size={12} />
+                </button>
+              )}
+              {searchDropdownOpen && searchResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-border rounded-[4px] shadow-lg z-50 max-h-64 overflow-y-auto">
+                  {searchResults.map((result) => (
+                    <button
+                      key={result.id}
+                      onClick={() => {
+                        setSelectedTaskId(result.id);
+                        setView('detail');
+                        setSearchQuery('');
+                        setSearchDropdownOpen(false);
+                      }}
+                      className="w-full px-3 py-2 text-left hover:bg-bg transition-colors flex items-center gap-3 border-b border-border/50 last:border-0"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-text-main truncate">{result.title}</p>
+                        <p className="text-[10px] text-text-muted truncate">{result.folder_path}</p>
+                      </div>
+                      <span className={cn(
+                        "text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0",
+                        result.status === 'Done' ? "bg-slate-100 text-slate-500" :
+                        result.status === 'In progress' ? "bg-amber-100 text-amber-600" :
+                        result.status === 'Review' ? "bg-green-100 text-green-600" :
+                        result.status === 'Blocked' ? "bg-red-100 text-red-600" :
+                        "bg-slate-100 text-slate-600"
+                      )}>
+                        {result.status}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {searchDropdownOpen && searchQuery.trim() && searchResults.length === 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-border rounded-[4px] shadow-lg z-50 p-4 text-center">
+                  <p className="text-xs text-text-muted">No results found</p>
+                </div>
+              )}
             </div>
           </div>
 

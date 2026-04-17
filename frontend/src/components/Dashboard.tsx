@@ -1,18 +1,8 @@
 
 import React from 'react';
 import { useTasks } from '../TaskContext';
-import { 
-  AlertCircle, 
-  CheckCircle2, 
-  Clock, 
-  Users, 
-  ChevronRight,
-  MoreVertical,
-  Layers,
-  Bot
-} from 'lucide-react';
 import { cn } from '../lib/utils';
-import { TaskStatus, TaskBrief } from '../types';
+import { TaskStatus } from '../types';
 
 interface DashboardProps {
   onOpenTask: (taskId: string) => void;
@@ -28,7 +18,7 @@ const STATUS_TAG_CLASSES: Record<TaskStatus, string> = {
 };
 
 export default function Dashboard({ onOpenTask }: DashboardProps) {
-  const { tasks, activeFolderId, activeTags } = useTasks();
+  const { tasks, focusItems, activeFolderId, activeTags } = useTasks();
 
   const filteredTasks = tasks.filter(task => {
     const matchesFolder = activeFolderId === 'all' || task.path.startsWith(activeFolderId);
@@ -36,8 +26,35 @@ export default function Dashboard({ onOpenTask }: DashboardProps) {
     return matchesFolder && matchesTags;
   });
 
-  // Focus Items (simulated logic)
-  const focusItems = tasks.filter(t => t.meta.status === 'Review' || t.meta.status === 'Blocked' || t.meta.status === 'AI working').slice(0, 3);
+  const getSubtitle = (status: string) => {
+    switch (status) {
+      case 'Review': return 'Unblocks downstream tasks';
+      case 'Blocked': return 'Needs resolution';
+      case 'AI working': return 'In progress by AI agent';
+      case 'In progress': return 'Work in progress';
+      default: return '';
+    }
+  };
+
+  const getActionLabel = (status: string) => {
+    switch (status) {
+      case 'Review': return 'OPEN REVIEW';
+      case 'Blocked': return 'RESOLVE BLOCKER';
+      case 'AI working': return 'VERIFY OUTPUT';
+      case 'In progress': return 'CONTINUE';
+      default: return 'OPEN';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Blocked': return 'bg-status-red';
+      case 'Review': return 'bg-status-blue';
+      case 'AI working': return 'bg-status-green';
+      case 'In progress': return 'bg-status-amber';
+      default: return 'bg-slate-300';
+    }
+  };
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto flex flex-col h-full">
@@ -45,35 +62,37 @@ export default function Dashboard({ onOpenTask }: DashboardProps) {
       <section className="shrink-0 space-y-3">
         <h2 className="text-[12px] font-bold text-text-muted uppercase tracking-wider pl-1">Needs your attention now</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {focusItems.map((task, i) => (
-            <div 
-              key={task.id} 
-              className={cn(
-                "group cursor-pointer bg-white border border-border p-4 rounded-lg relative overflow-hidden transition-all hover:border-primary/30",
-              )}
-              onClick={() => onOpenTask(task.id)}
-            >
-              <div className={cn(
-                "absolute left-0 top-3 bottom-3 w-[3px] rounded-r-[2px]",
-                task.meta.status === 'Blocked' ? "bg-status-red" : 
-                task.meta.status === 'Review' ? "bg-status-blue" : "bg-status-green"
-              )} />
-              
-              <h3 className="text-[13px] font-bold text-text-main mb-1 group-hover:text-primary transition-colors">
-                {task.meta.status === 'Review' ? 'Review: ' : task.meta.status === 'Blocked' ? 'Blocked: ' : 'AI Finish: '}
-                {task.goal.split('.')[0]}
-              </h3>
-              <p className="text-[11px] text-text-muted mb-4 line-clamp-1">
-                {task.meta.status === 'Review' ? `Unblocks 3 sub-tasks • ${task.meta.assignedAI}` : 
-                 task.meta.status === 'Blocked' ? `Database schema mismatch • P0` : 
-                 `100% coverage achieved • ${task.meta.assignedAI}`}
-              </p>
-              
-              <button className="w-full border border-primary text-primary bg-transparent py-1.5 rounded-[4px] text-[11px] font-bold uppercase transition-colors hover:bg-primary/5">
-                {task.meta.status === 'Review' ? 'OPEN REVIEW' : task.meta.status === 'Blocked' ? 'RESOLVE BLOCKER' : 'VERIFY OUTPUT'}
-              </button>
+          {focusItems.length === 0 ? (
+            <div className="col-span-full bg-white border border-border p-6 rounded-lg text-center">
+              <p className="text-[13px] text-text-muted">All caught up! No items need your attention right now.</p>
             </div>
-          ))}
+          ) : (
+            focusItems.map((item) => (
+              <div
+                key={item.id}
+                className={cn(
+                  "group cursor-pointer bg-white border border-border p-4 rounded-lg relative overflow-hidden transition-all hover:border-primary/30",
+                )}
+                onClick={() => onOpenTask(item.folder_path)}
+              >
+                <div className={cn(
+                  "absolute left-0 top-3 bottom-3 w-[3px] rounded-r-[2px]",
+                  getStatusColor(item.status)
+                )} />
+
+                <h3 className="text-[13px] font-bold text-text-main mb-1 group-hover:text-primary transition-colors truncate">
+                  {item.title}
+                </h3>
+                <p className="text-[11px] text-text-muted mb-4 line-clamp-1">
+                  {getSubtitle(item.status)}
+                </p>
+
+                <button className="w-full border border-primary text-primary bg-transparent py-1.5 rounded-[4px] text-[11px] font-bold uppercase transition-colors hover:bg-primary/5">
+                  {getActionLabel(item.status)}
+                </button>
+              </div>
+            ))
+          )}
         </div>
       </section>
 

@@ -27,3 +27,14 @@ class ExportContextUseCase:
             "brief_path": brief_path,
             "exported_files": [str(f) for f in files.values()],
         }
+
+    async def execute_content(self, brief_path: str) -> dict:
+        brief = await self.repository.get_by_path(brief_path)
+        if not brief:
+            raise ValueError(f"Brief not found: {brief_path}")
+
+        content = self.exporter.export_content(brief)
+        return {
+            "brief_path": brief_path,
+            "content": content,
+        }

@@ -1,24 +1,26 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTasks } from '../TaskContext';
-import { 
-  X, 
-  CheckSquare, 
-  MessageSquare, 
-  Settings, 
-  Clock, 
-  ExternalLink, 
+import {
+  X,
+  CheckSquare,
+  MessageSquare,
+  Settings,
+  Clock,
+  ExternalLink,
   Trash2,
   Plus,
   ArrowRight,
   Save,
   ChevronRight,
-  FileText
+  FileText,
+  RotateCcw
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { exportContext } from '../lib/exportUtils';
 import ReactMarkdown from 'react-markdown';
 import { ChecklistItem, Decision, TaskBrief } from '../types';
+import { briefsAPI, BriefDetailResponse } from '../services/api';
 
 interface TaskDetailProps {
   taskId: string | null;
@@ -30,9 +32,56 @@ type Tab = 'Brief' | 'Checklist' | 'Decisions' | 'Meta' | 'Timeline';
 export default function TaskDetail({ taskId, onClose }: TaskDetailProps) {
   const { tasks, updateTask } = useTasks();
   const [activeTab, setActiveTab] = useState<Tab>('Brief');
-  
+  const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
+  const [exportSuccess, setExportSuccess] = useState(false);
+  const [briefDetail, setBriefDetail] = useState<BriefDetailResponse | null>(null);
+  const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
+
   const originalTask = taskId ? tasks.find(t => t.id === taskId) : null;
   const [task, setTask] = useState<TaskBrief | null>(originalTask || null);
+
+  useEffect(() => {
+    if (taskId && originalTask?.path) {
+      briefsAPI.get(originalTask.path)
+        .then(detail => {
+          setBriefDetail(detail);
+        })
+        .catch(err => console.error('Failed to load brief detail:', err));
+    }
+  }, [taskId, originalTask?.path]);
+
+  const formatLastActive = (lastActiveAt: string | null) => {
+    if (!lastActiveAt) return 'Unknown';
+    const date = new Date(lastActiveAt);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays > 0) return `${diffDays}d ago`;
+    if (diffHours > 0) return `${diffHours}h ago`;
+    if (diffMins > 0) return `${diffMins}m ago`;
+    return 'Just now';
+  };
+
+  const handleRestoreSession = () => {
+    if (!briefDetail || !task) return;
+    setShowRestoreConfirm(true);
+  };
+
+  const confirmRestore = () => {
+    if (!briefDetail || !task) return;
+    const restoredTask: TaskBrief = {
+      ...task,
+      meta: {
+        ...task.meta,
+        currentStep: briefDetail.current_step,
+      },
+    };
+    updateTask(restoredTask);
+    setTask(restoredTask);
+    setShowRestoreConfirm(false);
+  };
 
   if (!task) {
     return (
@@ -47,6 +96,25 @@ export default function TaskDetail({ taskId, onClose }: TaskDetailProps) {
     if (task) {
       updateTask(task);
       onClose();
+    }
+  };
+
+  const handleExport = async (format: string) => {
+    setExportDropdownOpen(false);
+    try {
+      const response = await briefsAPI.exportBrief(task.path);
+      let content: string;
+      if (format === 'clipboard') {
+        content = response.content['CLAUDE.md'];
+      } else {
+        content = response.content[format as keyof typeof response.content];
+      }
+      await navigator.clipboard.writeText(content);
+      setExportSuccess(true);
+      setTimeout(() => setExportSuccess(false), 2000);
+    } catch (err) {
+      console.error('Export failed:', err);
+      alert('Failed to export context');
     }
   };
 
@@ -333,29 +401,114 @@ export default function TaskDetail({ taskId, onClose }: TaskDetailProps) {
         <div className="flex items-center gap-4">
            <div className="flex items-center gap-2">
              <Clock size={14} className="text-slate-400" />
-             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Last active 2h ago</span>
+             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+               Last active {formatLastActive(briefDetail?.last_active_at || null)}
+             </span>
            </div>
+           {briefDetail && briefDetail.current_step > 0 && (
+             <button
+               onClick={handleRestoreSession}
+               className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 border border-amber-200 rounded text-[10px] font-bold text-amber-700 hover:bg-amber-100 transition-colors"
+               title={`Restore to step ${briefDetail.current_step} of ${briefDetail.total_steps}`}
+             >
+               <RotateCcw size={12} />
+               Restore Session
+             </button>
+           )}
            <div className="flex items-center gap-2">
              <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Ready for Export</span>
            </div>
-         </div>
-         <div className="flex gap-2">
-           <button 
-             onClick={() => {
-               const files = exportContext(task);
-               console.log("Exported Files:", files);
-               alert("Context exported to console (simulated file generation)");
-             }}
-             className="px-4 py-2 bg-white border border-slate-200 rounded-md text-[10px] font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-100 transition-colors"
-           >
-              Export Context
-           </button>
-           <button className="px-4 py-2 bg-slate-900 border border-slate-900 rounded-md text-[10px] font-bold uppercase tracking-wider text-white hover:bg-black transition-colors">
-              Send to Agent
-           </button>
-         </div>
+          </div>
+          <div className="flex gap-2">
+            <div className="relative">
+              <button
+                onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
+                className="px-4 py-2 bg-white border border-slate-200 rounded-md text-[10px] font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-100 transition-colors flex items-center gap-1"
+              >
+                Export Context
+                <ChevronRight size={12} className={cn("transition-transform", exportDropdownOpen && "rotate-90")} />
+              </button>
+              {exportDropdownOpen && (
+                <div className="absolute right-0 mt-1 w-48 bg-white border border-slate-200 rounded-md shadow-lg z-50">
+                  <button
+                    onClick={() => handleExport('.cursorrules')}
+                    className="w-full px-3 py-2 text-left text-[10px] font-medium text-slate-700 hover:bg-slate-100 flex items-center gap-2"
+                  >
+                    <FileText size={12} />
+                    .cursorrules (Cursor)
+                  </button>
+                  <button
+                    onClick={() => handleExport('CLAUDE.md')}
+                    className="w-full px-3 py-2 text-left text-[10px] font-medium text-slate-700 hover:bg-slate-100 flex items-center gap-2"
+                  >
+                    <FileText size={12} />
+                    CLAUDE.md (Claude Code)
+                  </button>
+                  <button
+                    onClick={() => handleExport('AGENTS.md')}
+                    className="w-full px-3 py-2 text-left text-[10px] font-medium text-slate-700 hover:bg-slate-100 flex items-center gap-2"
+                  >
+                    <FileText size={12} />
+                    AGENTS.md (Codex)
+                  </button>
+                  <button
+                    onClick={() => handleExport('clipboard')}
+                    className="w-full px-3 py-2 text-left text-[10px] font-medium text-slate-700 hover:bg-slate-100 flex items-center gap-2 border-t border-slate-100"
+                  >
+                    <FileText size={12} />
+                    Clipboard (Markdown)
+                  </button>
+                </div>
+              )}
+            </div>
+            {exportSuccess && (
+              <span className="px-3 py-2 bg-success text-white rounded-md text-[10px] font-bold animate-pulse">
+                Copied to clipboard!
+              </span>
+            )}
+            <button className="px-4 py-2 bg-slate-900 border border-slate-900 rounded-md text-[10px] font-bold uppercase tracking-wider text-white hover:bg-black transition-colors">
+               Send to Agent
+            </button>
+          </div>
       </footer>
+
+      {showRestoreConfirm && briefDetail && (
+        <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full mx-4">
+            <h3 className="text-sm font-bold text-slate-900 mb-2">Restore Session</h3>
+            <p className="text-xs text-slate-600 mb-4">
+              This will restore the task to step {briefDetail.current_step} of {briefDetail.total_steps}.
+            </p>
+            <div className="space-y-2 mb-4">
+              <div className="flex items-center gap-2 text-xs text-slate-600">
+                <div className="w-2 h-2 rounded-full bg-primary" />
+                <span>Step {briefDetail.current_step} of {briefDetail.total_steps}</span>
+              </div>
+              {briefDetail.checklist_done > 0 && (
+                <div className="flex items-center gap-2 text-xs text-slate-600">
+                  <div className="w-2 h-2 rounded-full bg-success" />
+                  <span>{briefDetail.checklist_done} of {briefDetail.checklist_total} checklist items completed</span>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setShowRestoreConfirm(false)}
+                className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmRestore}
+                className="px-3 py-1.5 text-xs font-bold bg-amber-500 text-white rounded hover:bg-amber-600 transition-colors"
+              >
+                Restore
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

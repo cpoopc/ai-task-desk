@@ -231,6 +231,24 @@ async def export_context(
     return result
 
 
+@router.post("/{path:path}/export-content")
+async def export_context_content(
+    path: str,
+    service: BriefService = Depends(get_brief_service),
+):
+    from usecases.export_context import ExportContextUseCase
+    from api.deps import get_exporter
+
+    brief = await service.get_by_path(path)
+    if not brief:
+        raise HTTPException(status_code=404, detail="Brief not found")
+
+    exporter = get_exporter()
+    use_case = ExportContextUseCase(service.repository, exporter)
+    result = await use_case.execute_content(path)
+    return result
+
+
 @router.post("/rebuild-index")
 async def rebuild_index(
     service: BriefService = Depends(get_brief_service),

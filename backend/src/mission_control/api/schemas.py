@@ -99,17 +99,21 @@ class FolderResponse(BaseModel):
 class SprintCreate(BaseModel):
     name: str
     start_date: Optional[str] = None
+    end_date: Optional[str] = None
 
 
 class SprintUpdate(BaseModel):
     name: Optional[str] = None
     status: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
 
 
 class SprintResponse(BaseModel):
     id: str
     name: str
     start_date: Optional[str] = None
+    end_date: Optional[str] = None
     status: str = "active"
 
 

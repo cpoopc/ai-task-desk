@@ -19,7 +19,7 @@ async def create_sprint(
     data: SprintCreate,
     service: SprintService = Depends(get_sprint_service),
 ):
-    sprint = await service.create(data.name, data.start_date)
+    sprint = await service.create(data.name, data.start_date, data.end_date)
     return SprintResponse(**sprint)
 
 

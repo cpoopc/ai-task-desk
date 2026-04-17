@@ -154,3 +154,10 @@ class JinjaContextExporter:
         files["AGENTS.md"] = agents_md_path
 
         return files
+
+    def export_content(self, brief: Brief) -> dict[str, str]:
+        return {
+            ".cursorrules": self.export_cursorrules(brief),
+            "CLAUDE.md": self.export_claude_md(brief),
+            "AGENTS.md": self.export_agents_md(brief),
+        }

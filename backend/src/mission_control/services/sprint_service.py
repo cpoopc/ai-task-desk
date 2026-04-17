@@ -12,11 +12,14 @@ class SprintService:
     async def get(self, id: str) -> Optional[dict]:
         return self._sprints.get(id)
 
-    async def create(self, name: str, start_date: str | None = None) -> dict:
+    async def create(
+        self, name: str, start_date: str | None = None, end_date: str | None = None
+    ) -> dict:
         sprint = {
             "id": name,
             "name": name,
             "start_date": start_date or datetime.utcnow().isoformat(),
+            "end_date": end_date,
             "status": "active",
         }
         self._sprints[name] = sprint

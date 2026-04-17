@@ -217,7 +217,22 @@ class FileSystemAdapter:
 
         brief_content = f"# {title}\n\n## Goal\n\n\n## Technical Details\n\n\n## Constraints\n\n"
 
-        checklist_content = """# Checklist
+        template_types = {"api_dependency", "endpoint", "schema_change", "bug_fix", "refactor"}
+        if template_type in template_types:
+            template_checklist_path = (
+                Path(__file__).parent / "_templates" / template_type / "checklist.md"
+            )
+            if template_checklist_path.exists():
+                checklist_content = template_checklist_path.read_text()
+            else:
+                checklist_content = """# Checklist
+
+- [ ] Task item 1
+- [ ] Task item 2
+
+"""
+        else:
+            checklist_content = """# Checklist
 
 - [ ] Task item 1
 - [ ] Task item 2
