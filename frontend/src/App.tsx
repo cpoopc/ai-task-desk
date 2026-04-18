@@ -48,7 +48,7 @@ interface ContextMenuState {
 function AppContent() {
   const [view, setView] = useState<ViewMode>('dashboard');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const { tasks, folders, sprints, activeSprintId, setActiveSprintId, activeFolderId, setActiveFolderId, activeTags, toggleTag, useMockData, setUseMockData, error, createFolder, updateFolder, deleteFolder, moveFolder, createSprint } = useTasks();
+  const { tasks, folders, sprints, activeSprintId, setActiveSprintId, activeFolderId, setActiveFolderId, activeTags, toggleTag, useMockData, setUseMockData, error, createFolder, updateFolder, deleteFolder, moveFolder, createSprint, refreshTasks } = useTasks();
 
   const [folderModalOpen, setFolderModalOpen] = useState(false);
   const [sprintSummaryOpen, setSprintSummaryOpen] = useState(false);
@@ -583,7 +583,10 @@ function AppContent() {
                     name: 'New Brief',
                     template_type: 'default'
                   });
-                  setSelectedTaskId(newBrief.folder_path);
+                  await refreshTasks();
+                  // Small delay to ensure React processes the state update
+                  await new Promise(r => setTimeout(r, 50));
+                  setSelectedTaskId(newBrief.id);
                   setView('detail');
                 } catch (error) {
                   console.error('Failed to create brief:', error);

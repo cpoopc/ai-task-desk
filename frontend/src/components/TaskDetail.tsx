@@ -41,14 +41,43 @@ export default function TaskDetail({ taskId, onClose }: TaskDetailProps) {
   const [task, setTask] = useState<TaskBrief | null>(originalTask || null);
 
   useEffect(() => {
-    if (taskId && originalTask?.path) {
-      briefsAPI.get(originalTask.path)
+    if (!taskId) return;
+
+    const localTask = tasks.find(t => t.id === taskId);
+
+    if (localTask?.path) {
+      setTask(localTask);
+      briefsAPI.get(localTask.path)
+        .then(detail => {
+          setBriefDetail(detail);
+        })
+        .catch(err => console.error('Failed to load brief detail:', err));
+    } else {
+      // taskId is a folder_path for newly created briefs that haven't been synced yet
+      setTask({
+        id: taskId,
+        path: taskId,
+        goal: '',
+        technicalDetails: '',
+        constraints: [],
+        filesAffected: [],
+        checklist: [],
+        decisions: [],
+        meta: {
+          owner: { name: '', avatar: '' },
+          stakeholders: [],
+          tags: [],
+          externalLinks: [],
+          currentStep: 0
+        }
+      });
+      briefsAPI.get(taskId)
         .then(detail => {
           setBriefDetail(detail);
         })
         .catch(err => console.error('Failed to load brief detail:', err));
     }
-  }, [taskId, originalTask?.path]);
+  }, [taskId, tasks]);
 
   const formatLastActive = (lastActiveAt: string | null) => {
     if (!lastActiveAt) return 'Unknown';
