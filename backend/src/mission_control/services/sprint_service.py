@@ -1,10 +1,15 @@
 from typing import Optional
 from datetime import datetime, timezone
 
+from mission_control.adapters.jira_client import JiraClient
+from mission_control.config import get_settings
+
 
 class SprintService:
     def __init__(self):
         self._sprints: dict[str, dict] = {}
+        settings = get_settings()
+        self._jira = JiraClient() if settings.jira_url else None
 
     async def list(self) -> list[dict]:
         return list(self._sprints.values())
@@ -32,4 +37,19 @@ class SprintService:
         return self._sprints[id]
 
     async def sync_from_jira(self, id: str) -> dict:
-        return {"synced": True, "sprint_id": id}
+        if not self._jira:
+            return {"synced": False, "error": "Jira not configured"}
+
+        sprint_data = await self._jira.get_sprint(id)
+        if not sprint_data:
+            return {"synced": False, "error": "Sprint not found"}
+
+        self._sprints[id] = {
+            "id": id,
+            "name": sprint_data.get("name", id),
+            "state": sprint_data.get("state"),
+            "start_date": sprint_data.get("startDate"),
+            "end_date": sprint_data.get("endDate"),
+            "status": "active" if sprint_data.get("state") == "ACTIVE" else "closed",
+        }
+        return {"synced": True, "sprint_id": id, "name": sprint_data.get("name")}

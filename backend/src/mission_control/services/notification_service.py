@@ -4,14 +4,27 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
+import aiosmtplib
+import httpx
+from email.message import EmailMessage
+
+from mission_control.config import get_settings
+
 logger = logging.getLogger(__name__)
 
 
 class NotificationService:
     def __init__(self):
+        settings = get_settings()
         self._notifications: dict[str, dict] = {}
-        self._email_enabled = False
-        self._slack_enabled = False
+        self._email_enabled = bool(settings.smtp_host)
+        self._slack_enabled = bool(settings.slack_webhook_url)
+        self._slack_webhook_url = settings.slack_webhook_url
+        self._smtp_host = settings.smtp_host
+        self._smtp_port = settings.smtp_port
+        self._smtp_username = settings.smtp_username
+        self._smtp_password = settings.smtp_password
+        self._email_from = settings.email_from
 
     async def send_notification(
         self,
@@ -35,21 +48,37 @@ class NotificationService:
 
     async def send_email(self, to: str, subject: str, body: str) -> bool:
         if not self._email_enabled:
-            logger.info(f"Email disabled. Would send to {to}: {subject}")
-            return True
+            logger.warning("Email not configured. Set smtp_host in settings.")
+            return False
         try:
-            logger.info(f"Sending email to {to}: {subject}")
+            email = EmailMessage()
+            email["From"] = self._email_from or self._smtp_username
+            email["To"] = to
+            email["Subject"] = subject
+            email.set_content(body)
+            await aiosmtplib.send(
+                email,
+                hostname=self._smtp_host,
+                port=self._smtp_port or 587,
+                username=self._smtp_username,
+                password=self._smtp_password,
+                start_tls=True,
+            )
+            logger.info(f"Email sent to {to}: {subject}")
             return True
         except Exception as e:
             logger.error(f"Failed to send email: {e}")
             return False
 
     async def send_slack(self, webhook_url: str, message: str) -> bool:
-        if not self._slack_enabled:
-            logger.info(f"Slack disabled. Would send to {webhook_url}: {message}")
-            return True
+        if not self._slack_enabled and not webhook_url:
+            logger.warning("Slack webhook not configured.")
+            return False
+        url = webhook_url or self._slack_webhook_url
         try:
-            logger.info(f"Sending Slack message: {message}")
+            async with httpx.AsyncClient() as client:
+                await client.post(url, json={"text": message})
+            logger.info(f"Slack message sent: {message}")
             return True
         except Exception as e:
             logger.error(f"Failed to send Slack message: {e}")

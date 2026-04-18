@@ -24,6 +24,14 @@ class Settings(BaseSettings):
     sync_enabled: bool = False
     sync_interval: int = 300
 
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    email_from: str | None = None
+
+    slack_webhook_url: str | None = None
+
 
 @lru_cache
 def get_settings() -> Settings:

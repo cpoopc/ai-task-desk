@@ -77,30 +77,12 @@ export default function ContactList({ isOpen, onClose }: ContactListProps) {
     setShowAddForm(true);
   };
 
-  const handleImportJira = async () => {
-    const mockJiraData = [
-      { displayName: 'John Smith', emailAddress: 'john@example.com', accountId: 'jira123' },
-      { displayName: 'Jane Doe', emailAddress: 'jane@example.com', accountId: 'jira456' },
-    ];
-    try {
-      const imported = await contactsAPI.importFromJira(mockJiraData);
-      setContacts([...contacts, ...imported]);
-    } catch (err) {
-      console.error('Failed to import from Jira:', err);
-    }
+  const handleImportJira = () => {
+    alert('Jira import requires Jira API credentials. Please configure JIRA_URL, JIRA_EMAIL, and JIRA_API_TOKEN in your environment.');
   };
 
-  const handleImportSlack = async () => {
-    const mockSlackData = [
-      { real_name: 'Alice Johnson', email: 'alice@company.com', id: 'U12345' },
-      { real_name: 'Bob Wilson', email: 'bob@company.com', id: 'U67890' },
-    ];
-    try {
-      const imported = await contactsAPI.importFromSlack(mockSlackData);
-      setContacts([...contacts, ...imported]);
-    } catch (err) {
-      console.error('Failed to import from Slack:', err);
-    }
+  const handleImportSlack = () => {
+    alert('Slack import requires Slack API credentials. Please configure SLACK_BOT_TOKEN and SLACK_TEAM_ID in your environment.');
   };
 
   const filteredContacts = contacts.filter(c =>

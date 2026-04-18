@@ -180,10 +180,9 @@ export default function LivingPlan() {
                 className="flex-1 overflow-y-auto p-3 space-y-2"
               >
                 {poolTasks.map((task, index) => (
-                  <Draggable draggableId={task.id} index={index}>
-                    {(provided) => (
+                  <Draggable key={task.id} draggableId={task.id} index={index}>
+                    {(provided, snapshot) => (
                       <div
-                        key={task.id}
                         ref={provided.innerRef}
                         {...provided.draggableProps}
                         {...provided.dragHandleProps}
@@ -194,11 +193,11 @@ export default function LivingPlan() {
                           <GripVertical size={10} className="text-slate-300 group-hover:text-primary" />
                         </div>
                         <h4 className="text-[12px] font-semibold text-text-main leading-snug line-clamp-2">{task.goal}</h4>
+                        {snapshot.isDragging && provided.placeholder}
                       </div>
                     )}
                   </Draggable>
                 ))}
-                {provided.placeholder}
                 {poolTasks.length === 0 && (
                   <div className="py-12 text-center">
                     <p className="text-[10px] text-text-muted font-bold uppercase">No tasks found</p>
@@ -301,10 +300,9 @@ export default function LivingPlan() {
                         )}
                       >
                         {day.tasks.map((item: any, i: number) => (
-                          <Draggable draggableId={item.taskId + '-' + i} index={i}>
-                            {(provided) => (
+                          <Draggable key={item.taskId + '-' + i} draggableId={item.taskId + '-' + i} index={i}>
+                            {(provided, snapshot) => (
                               <div 
-                                key={item.taskId + '-' + i}
                                 ref={provided.innerRef}
                                 {...provided.draggableProps}
                                 {...provided.dragHandleProps}
@@ -347,11 +345,11 @@ export default function LivingPlan() {
                                        <Trash2 size={12} />
                                     </button>
                                  </div>
+                                 {snapshot.isDragging && provided.placeholder}
                               </div>
                             )}
                           </Draggable>
                         ))}
-                        {provided.placeholder}
                       </div>
                     )}
                   </Droppable>
