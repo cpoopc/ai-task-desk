@@ -95,6 +95,14 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         briefsRes.map((b) => briefsAPI.get(b.folder_path).catch(() => null))
       );
 
+      // Build a map of folder_path -> sprint_name from the list response
+      const folderToSprint = new Map<string, string>();
+      briefsRes.forEach((b) => {
+        if (b.sprint_name) {
+          folderToSprint.set(b.folder_path, b.sprint_name);
+        }
+      });
+
       const validTasks = tasksFromApi.filter(Boolean).map((t) => ({
         id: t!.id,
         path: t!.folder_path,
@@ -128,7 +136,9 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           resources: [],
         },
         subtasks: [],
-      })) as TaskBrief[];
+        // Store sprint name for filtering
+        sprintName: folderToSprint.get(t!.folder_path) || '',
+      })) as (TaskBrief & { sprintName: string })[];
       setTasks(validTasks);
       setSprints(sprintsRes.map((s: { id: string; name: string; start_date?: string; end_date?: string; status: string }) => ({
         id: s.id,
@@ -136,8 +146,8 @@ export const TaskProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         startDate: s.start_date || '',
         endDate: s.end_date || '',
         dayCount: 0,
-        storyCount: validTasks.filter(t => t.path.startsWith(s.name)).length,
-        tasks: validTasks.filter(t => t.path.startsWith(s.name)).map(t => t.id),
+        storyCount: validTasks.filter(t => t.sprintName === s.name).length,
+        tasks: validTasks.filter(t => t.sprintName === s.name).map(t => t.id),
       })));
 
       const folderTree = foldersRes as ApiFolder;
