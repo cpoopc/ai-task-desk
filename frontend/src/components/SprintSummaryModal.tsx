@@ -137,7 +137,7 @@ ${summary.recommendations.length > 0 ? summary.recommendations.map(r => `- ${r}`
               <div>
                 <h4 className="text-xs font-semibold text-slate-700 mb-2">Task Status Breakdown</h4>
                 <div className="space-y-2">
-                  {Object.entries(summary.tasks_by_status).map(([status, count]) => {
+                  {(Object.entries(summary.tasks_by_status) as [string, number][]).map(([status, count]) => {
                     const percentage = summary.total_tasks > 0 ? (count / summary.total_tasks) * 100 : 0;
                     const colors: Record<string, string> = {
                       todo: 'bg-slate-400',

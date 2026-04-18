@@ -43,7 +43,7 @@ export default function LivingPlan() {
 
   const activeSprint = sprints.find(s => s.id === activeSprintId);
   
-  const allPoolTags = Array.from(new Set(tasks.flatMap(t => t.meta.tags)));
+  const allPoolTags = Array.from(new Set(tasks.flatMap(t => t.meta.tags as string[]))) as string[];
 
   const togglePoolTag = (tag: string) => {
     setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
@@ -180,9 +180,10 @@ export default function LivingPlan() {
                 className="flex-1 overflow-y-auto p-3 space-y-2"
               >
                 {poolTasks.map((task, index) => (
-                  <Draggable key={task.id} draggableId={task.id} index={index}>
+                  <Draggable draggableId={task.id} index={index}>
                     {(provided) => (
                       <div
+                        key={task.id}
                         ref={provided.innerRef}
                         {...provided.draggableProps}
                         {...provided.dragHandleProps}
@@ -300,9 +301,10 @@ export default function LivingPlan() {
                         )}
                       >
                         {day.tasks.map((item: any, i: number) => (
-                          <Draggable key={item.taskId + '-' + i} draggableId={item.taskId + '-' + i} index={i}>
+                          <Draggable draggableId={item.taskId + '-' + i} index={i}>
                             {(provided) => (
                               <div 
+                                key={item.taskId + '-' + i}
                                 ref={provided.innerRef}
                                 {...provided.draggableProps}
                                 {...provided.dragHandleProps}
